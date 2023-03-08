@@ -127,11 +127,3 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
-
-# log files
-logs/
-
-# pytorch model checkpoints
-*checkpoints/
-
-*.idea/
