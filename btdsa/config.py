@@ -46,7 +46,7 @@ class Config(EasyDict):
             cls.sigma = 0.1  # used in ranking loss
 
         # if true, interpolate discrete-time model outputs for evaluation
-        cls.interpolate_discrete_times = cls.model_name in ['DeepHitSingle', 'LogisticHazard', 'PMF', 'MTLR', 'BCESurv']
+        cls.interpolate_discrete_times = (cls.model_name in ['DeepHitSingle', 'LogisticHazard', 'PMF', 'MTLR', 'BCESurv']) and (cls.time_range == 'full')
 
         if not torch.backends.mps.is_available():
             cls.device = 'cuda:0' if torch.cuda.is_available() else 'cpu'  # Apple's M1 mac setup

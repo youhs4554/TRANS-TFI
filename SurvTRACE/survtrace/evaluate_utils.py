@@ -4,6 +4,7 @@ from pycox.evaluation import EvalSurv
 from sksurv.metrics import concordance_index_ipcw, brier_score, cumulative_dynamic_auc
 import numpy as np
 import pdb
+import scipy.stats as st
 
 class Evaluator:
     def __init__(self, df, train_index):
@@ -13,6 +14,8 @@ class Evaluator:
         self.df_train_all = df.loc[train_index]
 
     def eval_single(self, model, test_set, val_batch_size=None):
+        metric_dict = defaultdict(list)
+
         df_train_all = self.df_train_all
         get_target = lambda df: (df['duration'].values, df['event'].values)
         durations_train, events_train = get_target(df_train_all)
@@ -32,9 +35,7 @@ class Evaluator:
         surv_df = model.predict_surv_df(df_test)
         ev = EvalSurv(surv_df, durations_test, events_test, censor_surv='km')
         ctd = ev.concordance_td('antolini')
-        print("C-td: ", ctd)
-
-        metric_dict = defaultdict(list)
+        metric_dict['C-td-full'] = ctd
         brs = brier_score(et_train, et_test, surv.to("cpu").numpy()[:,1:-1], times)[1]
         # from IPython.core.debugger import set_trace
         # set_trace()
@@ -46,15 +47,15 @@ class Evaluator:
                 concordance_index_ipcw(et_train, et_test, estimate=risk[:, i+1].to("cpu").numpy(), tau=times[i])[0]
                 )
             aucs.append(cumulative_dynamic_auc(et_train, et_test, risk[:, i+1].to("cpu").numpy(), times[i])[0].item())
-            metric_dict[f'{horizons[i]}_ipcw'] = cis[i]
+            metric_dict[f'{horizons[i]}_Ctd_ipcw'] = cis[i]
             metric_dict[f'{horizons[i]}_brier'] = brs[i]
             metric_dict[f'{horizons[i]}_auroc'] = aucs[i]
 
-        for horizon in enumerate(horizons):
-            print(f"For {horizon[1]} quantile,")
-            print("TD Concordance Index - IPCW:", cis[horizon[0]])
-            print("Brier Score:", brs[horizon[0]])
-            print("Dynamic AUC: ", aucs[horizon[0]])
+        # for horizon in enumerate(horizons):
+        #     print(f"For {horizon[1]} quantile,")
+        #     print("TD Concordance Index - IPCW:", cis[horizon[0]])
+        #     print("Brier Score:", brs[horizon[0]])
+        #     print("Dynamic AUC: ", aucs[horizon[0]])
         return metric_dict
 
     def eval_multi(self, model, test_set, val_batch_size=10000):
@@ -124,15 +125,12 @@ class Evaluator:
             metric_dict = {}
             # compute confidence interveal 95%
             alpha = confidence
-            p1 = ((1-alpha)/2) * 100
-            p2 = (alpha+((1.0-alpha)/2.0)) * 100
             for k in stats_dict.keys():
                 stats = stats_dict[k]
-                lower = max(0, np.percentile(stats, p1))
-                upper = min(1.0, np.percentile(stats, p2))
-                # print(f'{alpha} confidence interval {lower} and {upper}')
-                print(f'{alpha} confidence {k} average:', (upper+lower)/2)
-                print(f'{alpha} confidence {k} interval:', (upper-lower)/2)
-                metric_dict[k] = [(upper+lower)/2, (upper-lower)/2]
+                mean = np.mean(stats)
+                ci = st.t.interval(alpha, len(stats) - 1, loc=mean, scale=st.sem(stats))  # 95% CI
+                metric_dict[k] = (mean, ci)
+                print(f'{alpha} confidence {k} average:', mean)
+                print(f'{alpha} confidence {k} interval: ({ci[0]},{ci[1]})')
 
             return metric_dict

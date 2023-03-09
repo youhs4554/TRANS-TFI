@@ -32,7 +32,6 @@ class EvalSurv:
         self.headers.append(self.trainer.dataset)
 
         cindex_mean, (cindex_lower, cindex_upper) = result_dict.pop('C-td-full')
-
         row_str = f"C-td (full): {cindex_mean:.6f} ({cindex_lower:.6f},{cindex_upper:.6f})\n"
 
         for horizon in horizons:
