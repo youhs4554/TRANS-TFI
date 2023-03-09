@@ -21,18 +21,18 @@ TDSA_MODEL_LIST = [
 class Config(EasyDict):
     model_name = 'BTDSA'  # which model to use
     time_range = 'full'  # valid only for discrete-time models (options: full | truncated)
+    random_state = 1234  # static random state for deterministic results
+    n_ep = 3000  # number of epochs
 
     @classmethod
     def setup(cls):
         cls.horizons = [.25, .5, .75]  # truncated time horizons 25%, 50%, 75%
         cls.list_of_datasets = ['gbsg', 'metabric', 'support']  # name of dataset
-        cls.random_state = 1234  # static random state for deterministic results
 
         assert cls.model_name in BASELINE_MODEL_FAMILY + TDSA_MODEL_LIST
 
         cls.lr = 1e-3  # learning rate
         cls.weight_decay = 1e-4  # weight decay strength
-        cls.n_ep = 3000  # number of epochs
         cls.seq_len = 20  # default length
         if cls.time_range == 'truncated':
             cls.seq_len = 3

@@ -36,6 +36,8 @@ class Evaluator:
 
         metric_dict = defaultdict(list)
         brs = brier_score(et_train, et_test, surv.to("cpu").numpy()[:,1:-1], times)[1]
+        # from IPython.core.debugger import set_trace
+        # set_trace()
 
         cis = []
         aucs = []
@@ -89,7 +91,7 @@ class Evaluator:
 
         return metric_dict
 
-    def eval(self, model, test_set, confidence=None, val_batch_size=None):
+    def eval(self, model, test_set, confidence=None, val_batch_size=None, nb_bootstrap=100):
         '''do evaluation.
         if confidence is not None, it should be in (0, 1) and the confidence
         interval will be given by bootstrapping.
@@ -107,7 +109,7 @@ class Evaluator:
         else:
             # do bootstrapping
             stats_dict = defaultdict(list)
-            for i in range(10):
+            for i in range(nb_bootstrap):
                 df_test = test_set[0].sample(test_set[0].shape[0], replace=True)
                 df_y_test = test_set[1].loc[df_test.index]
 

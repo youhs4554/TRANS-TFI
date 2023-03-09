@@ -1,9 +1,8 @@
 import numpy as np
-from pycox import utils
-from sksurv.metrics import concordance_index_ipcw, brier_score, cumulative_dynamic_auc
+import prettytable as pt
+
 from btdsa.train_utils import get_target
 from btdsa.utils import bootstrap_eval
-import prettytable as pt
 
 
 class EvalSurv:
@@ -17,48 +16,34 @@ class EvalSurv:
 
         assert hasattr(self.trainer, "trained_model"), "You need to fit() model first. The model is not fitted yet!"
 
+        t_train, e_train = get_target(self.trainer.df_train_raw)
+        et_train = np.array([(e_train[i], t_train[i]) for i in range(len(e_train))],
+                            dtype=[('e', bool), ('t', float)])
+        taus = self.trainer.taus
+        horizons = self.trainer.cfg.horizons
+
         # bootstrap evaluation
-        result = bootstrap_eval(self.trainer.trained_model, x_test, durations_test, events_test,
-                                interpolate_discrete_times=self.trainer.interpolate_discrete_times,
-                                nb_bootstrap=self.trainer.cfg.nb_bootstrap)
+        result_dict = bootstrap_eval(self.trainer.trained_model, x_test, durations_test, events_test, et_train,
+                                     taus, horizons,
+                                     interpolate_discrete_times=self.trainer.interpolate_discrete_times,
+                                     nb_bootstrap=self.trainer.cfg.nb_bootstrap)
 
         # for beautified result table
         self.headers.append(self.trainer.dataset)
-        row_str = f"{result['mean']:.6f} ({result['confidence_interval'][0]:.6f},{result['confidence_interval'][1]:.6f})\n"
 
-        # eval IPCW/Brier/AUC
-        t_train, e_train = get_target(self.trainer.df_train_raw)
-        t_val, e_val = get_target(self.trainer.df_val_raw)
-        t_test, e_test = get_target(self.trainer.df_test_raw)
+        cindex_mean, (cindex_lower, cindex_upper) = result_dict.pop('C-td-full')
 
-        cis = []
-        brs = []
+        row_str = f"C-td (full): {cindex_mean:.6f} ({cindex_lower:.6f},{cindex_upper:.6f})\n"
 
-        et_train = np.array([(e_train[i], t_train[i]) for i in range(len(e_train))],
-                            dtype=[('e', bool), ('t', float)])
-        et_test = np.array([(e_test[i], t_test[i]) for i in range(len(e_test))],
-                           dtype=[('e', bool), ('t', float)])
-        et_val = np.array([(e_val[i], t_val[i]) for i in range(len(e_val))],
-                          dtype=[('e', bool), ('t', float)])
-
-        taus = self.trainer.taus
-        idx = utils.idx_at_times(surv.index, taus, 'post')
-        out_survival = surv.iloc[idx].T
-        out_risk = 1.0 - out_survival
-
-        # pd -> numpy
-        out_survival = np.array(out_survival)
-        out_risk = np.array(out_risk)
-
-        for i, _ in enumerate(taus):
-            cis.append(concordance_index_ipcw(et_train, et_test, out_risk[:, i], taus[i])[0])
-        brs.append(brier_score(et_train, et_test, out_survival, taus)[1])
-        roc_auc = []
-        for i, _ in enumerate(taus):
-            roc_auc.append(cumulative_dynamic_auc(et_train, et_test, out_risk[:, i], taus[i])[0].item())
-
-        for i, horizon in enumerate(self.trainer.cfg.horizons):
-            row_str += f"[{horizon * 100}%] C-td: {cis[i]:.6f}, Brier: {brs[0][i]:.6f}, AUC-td: {roc_auc[i]:.6f}\n"
+        for horizon in horizons:
+            keys = [ k for k in result_dict.keys() if k.startswith(str(horizon)) ]
+            results_at_horizon = [result_dict[k] for k in keys]
+            msg = [f"[{horizon*100}%]"]
+            for k,res in zip(keys,results_at_horizon):
+                metric = k.split('_')[1]
+                mean, (lower, upper) = res
+                msg.append(f"{metric}: {mean:.6f} ({lower:.6f},{upper:.6f})")
+            row_str += (" ".join(msg) + "\n")
         self.results.append(row_str)
 
     def report(self):
