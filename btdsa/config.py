@@ -23,6 +23,7 @@ class Config(EasyDict):
     time_range = 'full'  # valid only for discrete-time models (options: full | truncated)
     random_state = 1234  # static random state for deterministic results
     n_ep = 3000  # number of epochs
+    model_save_dir = Path('./model_dir')
 
     @classmethod
     def setup(cls):

@@ -1,7 +1,9 @@
+import os.path
 from pathlib import Path
 
 import numpy as np
 import pycox.models
+import torch
 import torchtuples as tt
 from pycox.models.cox_time import MLPVanillaCoxTime
 from torch.utils.data import DataLoader
@@ -32,6 +34,7 @@ class PyCoxTrainer:
         self.trained_model = None
         self.logger = None
 
+
         self.model_name = cfg.model_name
         self.net_class = tt.practical.MLPVanilla
         if cfg.model_name == 'CoxTime':
@@ -41,6 +44,8 @@ class PyCoxTrainer:
         self.seq_len = cfg.seq_len
         self.interpolate_discrete_times = (
                 self.model_name in ['DeepHitSingle', 'LogisticHazard', 'PMF', 'MTLR', 'BCESurv']+TDSA_MODEL_LIST)
+        self.model_save_dir = cfg.model_save_dir
+        os.makedirs(self.model_save_dir, exist_ok=True)
         self.cfg = cfg
 
         # for deterministic results
@@ -97,7 +102,7 @@ class PyCoxTrainer:
         net.to(self.cfg.device)
         return net
 
-    def fit_and_predict(self, dataset, fit_dataloader=False):
+    def fit_and_predict(self, dataset, weight_file=''):
         self.preprocess(dataset)
         net = self.make_net()
         kwargs = {}
@@ -106,21 +111,28 @@ class PyCoxTrainer:
         if self.labtrans is not None:
             kwargs["duration_index"] = self.labtrans.cuts
 
+        fitting = True
+        if weight_file:
+            assert os.path.exists(weight_file)
+            fitting = False
+            state_dict = torch.load(weight_file)
+            net.load_state_dict(state_dict)
+
         model = self.model_class(net, tt.optim.Adam(lr=self.cfg.lr, weight_decay=self.cfg.weight_decay), **kwargs)
 
-        self.logger.info(f"Running {dataset}...")
+        if fitting:
+            self.logger.info(f"Running {dataset}...")
+            verbose = False if self.cfg.silent_fit else True
 
-        verbose = False if self.cfg.silent_fit else True
-
-        if isinstance(self.train, DataLoader) and isinstance(self.val, DataLoader):
-            log = model.fit_dataloader(self.train, epochs=self.cfg.n_ep, callbacks=[tt.callbacks.EarlyStopping()],
-                                       val_dataloader=self.val, verbose=verbose)
-        else:
-            log = model.fit(*self.train, epochs=self.cfg.n_ep, callbacks=[tt.callbacks.EarlyStopping()],
-                            val_data=self.val, verbose=verbose)
-        history = log.to_pandas()
-        history.to_csv(Path(self.cfg.logs_dir) / self.logger.handlers[0].baseFilename.replace('.log', '_hitory.csv'),
-                       index_label='epoch')
+            if isinstance(self.train, DataLoader) and isinstance(self.val, DataLoader):
+                log = model.fit_dataloader(self.train, epochs=self.cfg.n_ep, callbacks=[tt.callbacks.EarlyStopping()],
+                                           val_dataloader=self.val, verbose=verbose)
+            else:
+                log = model.fit(*self.train, epochs=self.cfg.n_ep, callbacks=[tt.callbacks.EarlyStopping()],
+                                val_data=self.val, verbose=verbose)
+            history = log.to_pandas()
+            history.to_csv(Path(self.cfg.logs_dir) / self.logger.handlers[0].baseFilename.replace('.log', '_hitory.csv'),
+                           index_label='epoch')
 
         # Inference
         x_test, _ = self.test
@@ -132,6 +144,8 @@ class PyCoxTrainer:
             surv = model.predict_surv_df(x_test)
 
         self.trained_model = model
+        model_save_path = self.model_save_dir / f"{self.model_name}_{self.time_range}_L{self.seq_len}.pth"
+        self.trained_model.save_model_weights(model_save_path)
 
         return surv, model
 

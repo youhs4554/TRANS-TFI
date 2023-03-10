@@ -136,3 +136,5 @@ logs/
 *_checkpoint_*
 
 *.idea/
+
+*model_dir/
