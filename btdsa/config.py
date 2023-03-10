@@ -67,7 +67,6 @@ class Config(EasyDict):
             cls.net_kwargs = dict(
                 hidden_dim=64,
                 n_layers=3,  # number of LSTM layer(s)
-                LSTM_dropout=0.0,  # LSTM dropout
                 bidirectional=use_BTDSA
             )
         else:

@@ -35,8 +35,6 @@ class TDSA(nn.Module):
             n_layers: int,
             embeddings: List[nn.Embedding],
             output_size: int = 1,
-            LSTM_dropout: float = 0.0,
-            Linear_dropout: float = 0.0,
             bidirectional: bool = True
     ):
         """
@@ -53,10 +51,6 @@ class TDSA(nn.Module):
               the 2nd corresponds with the 1st feature, and so on.
         * `output_size`:
             - size of the linear layer's output, which should always be 1, unless altering this model
-        * `LSTM_dropout`:
-            - percent of neurons in LSTM layer to apply dropout regularization to during training
-        * `Linear_dropout`:
-            - percent of neurons in linear layer to apply dropout regularization to during training
         * `bidirectional`:
             - use bidirectional or not
         """
@@ -78,13 +72,11 @@ class TDSA(nn.Module):
             self.hidden_dim,
             self.n_layers,
             batch_first=True,
-            dropout=LSTM_dropout,
             bidirectional=bidirectional
         )
         if bidirectional:
             hidden_dim = hidden_dim * 2
         self.fc = nn.Linear(hidden_dim, output_size)
-        self.linear_dropout = nn.Dropout(p=Linear_dropout)
         self.sigmoid = nn.Sigmoid()
 
         # making sure embeddings get trained
@@ -112,7 +104,7 @@ class TDSA(nn.Module):
         out, hidden = self.lstm(all_features.float())
 
         # passing to linear layer to reshape for predictions
-        out = self.sigmoid(self.linear_dropout(self.fc(out)))
+        out = self.sigmoid(self.fc(out))
 
         return out
 
