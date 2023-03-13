@@ -120,6 +120,9 @@ class PyCoxTrainer:
 
         model = self.model_class(net, tt.optim.Adam(lr=self.cfg.lr, weight_decay=self.cfg.weight_decay), **kwargs)
 
+        if hasattr(model, 'compute_baseline_hazards'):
+            model.training_data = self.train
+
         if fitting:
             self.logger.info(f"Running {dataset}...")
             verbose = False if self.cfg.silent_fit else True
