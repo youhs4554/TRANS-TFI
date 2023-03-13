@@ -136,10 +136,9 @@ class PyCoxWrapper(tt.Model):
                      num_workers=0):
         # pmf = self.predict_pmf(input, batch_size, False, eval_, to_cpu, num_workers)
         preds = self.predict(input, batch_size, False, eval_, False, to_cpu, num_workers)
-        preds = pad_col(preds[..., 0])[:, :-1]
         # surv = (1-preds).cumprod(1)
         # surv = 1 - preds.cumsum(1)
-        surv = (1 - preds).add(1e-7).log().cumsum(1).exp()
+        surv = (1 - preds[..., 0]).add(1e-7).log().cumsum(1).exp()
         return tt.utils.array_or_tensor(surv, numpy, input)
 
     def predict_pmf(self, input, batch_size=8224, numpy=None, eval_=True, to_cpu=False,

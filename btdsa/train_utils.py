@@ -137,14 +137,14 @@ class PyCoxTrainer:
         # Inference
         x_test, _ = self.test
         if self.interpolate_discrete_times:
-            surv = model.interpolate(100).predict_surv_df(x_test)
+            surv = model.interpolate(100).predict_surv(x_test)
         else:
             if hasattr(model, 'compute_baseline_hazards'):
                 _ = model.compute_baseline_hazards()
             surv = model.predict_surv_df(x_test)
 
         self.trained_model = model
-        model_save_path = self.model_save_dir / f"{self.model_name}_{self.time_range}_L{self.seq_len}.pth"
+        model_save_path = self.model_save_dir / f"{self.model_name}_{self.time_range}_L{self.seq_len}_{dataset}.pth"
         self.trained_model.save_model_weights(model_save_path)
 
         return surv, model
