@@ -31,10 +31,10 @@ def run_experiment(model_name, time_range='full'):
     ev.report()  # log and report results in beautiful tables
 
 # # Comparison with Baselines; CoxPH(=DeepSurv), DeepHitSingle
-run_experiment('CoxPH')
-run_experiment('DeepHitSingle', time_range='full')
-run_experiment('DeepHitSingle', time_range='truncated')
-
-# Ours : Bidirectional Time Dependent Survival Analysis (BTDSA)
-run_experiment('BTDSA', time_range='full')
+# run_experiment('CoxPH')
+# run_experiment('DeepHitSingle', time_range='full')
+# run_experiment('DeepHitSingle', time_range='truncated')
+#
+# # Ours : Bidirectional Time Dependent Survival Analysis (BTDSA)
+# run_experiment('BTDSA', time_range='full')
 run_experiment('BTDSA', time_range='truncated')

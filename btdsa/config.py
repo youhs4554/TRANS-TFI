@@ -21,7 +21,7 @@ TDSA_MODEL_LIST = [
 class Config(EasyDict):
     model_name = 'BTDSA'  # which model to use
     time_range = 'full'  # valid only for discrete-time models (options: full | truncated)
-    random_state = 1234  # static random state for deterministic results
+    random_state = 42  # static random state for deterministic results
     n_ep = 3000  # number of epochs
     model_save_dir = Path('./model_dir')
 
@@ -40,6 +40,7 @@ class Config(EasyDict):
         cls.show_plot = False  # if true, plot learning curves
         cls.silent_fit = True  # if true, do not show training progress
         cls.nb_bootstrap = 100  # number of bootstrap evaluations
+        cls.es_patience = 10
 
         if cls.model_name == "DeepHitSingle":
             # Used for DeepHit loss

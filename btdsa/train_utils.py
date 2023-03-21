@@ -5,6 +5,7 @@ import numpy as np
 import pycox.models
 import torch
 import torchtuples as tt
+from matplotlib import pyplot as plt
 from pycox.models.cox_time import MLPVanillaCoxTime
 from torch.utils.data import DataLoader
 
@@ -126,19 +127,22 @@ class PyCoxTrainer:
         if fitting:
             self.logger.info(f"Running {dataset}...")
             verbose = False if self.cfg.silent_fit else True
+            es_patience = self.cfg.es_patience
 
             if isinstance(self.train, DataLoader) and isinstance(self.val, DataLoader):
                 lr_finder = model.lr_finder_dataloader(self.train, tolerance=3)
                 best_lr = lr_finder.get_best_lr()
                 model.optimizer.set_lr(best_lr / 3)
-                log = model.fit_dataloader(self.train, epochs=self.cfg.n_ep, callbacks=[tt.callbacks.EarlyStopping()],
+                log = model.fit_dataloader(self.train, epochs=self.cfg.n_ep, callbacks=[tt.callbacks.EarlyStopping(patience=es_patience)],
                                            val_dataloader=self.val, verbose=verbose)
             else:
                 lr_finder = model.lr_finder(*self.train, tolerance=3)
                 best_lr = lr_finder.get_best_lr()
                 model.optimizer.set_lr(best_lr / 3)
-                log = model.fit(*self.train, epochs=self.cfg.n_ep, callbacks=[tt.callbacks.EarlyStopping()],
+                log = model.fit(*self.train, epochs=self.cfg.n_ep, callbacks=[tt.callbacks.EarlyStopping(patience=es_patience)],
                                 val_data=self.val, verbose=verbose)
+            if self.cfg.show_plot:
+                log.plot(); plt.show()
             history = log.to_pandas()
             history.to_csv(Path(self.cfg.logs_dir) / self.logger.handlers[0].baseFilename.replace('.log', '_hitory.csv'),
                            index_label='epoch')

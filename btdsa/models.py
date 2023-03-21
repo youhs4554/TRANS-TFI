@@ -107,7 +107,7 @@ class TDSA(nn.Module):
 
         t = torch.arange(self.n_durations).unsqueeze(1).unsqueeze(0) / (self.n_durations-1)
         t = t.tile(X.shape[0], 1, 1)
-        all_features = torch.cat((all_features, t), dim=-1)
+        all_features = torch.cat((all_features, t.to(X.device)), dim=-1)
 
         # passing input and hidden into model (hidden initialized as zeros)
         out, hidden = self.lstm(all_features.float())
