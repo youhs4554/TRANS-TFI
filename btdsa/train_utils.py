@@ -128,9 +128,15 @@ class PyCoxTrainer:
             verbose = False if self.cfg.silent_fit else True
 
             if isinstance(self.train, DataLoader) and isinstance(self.val, DataLoader):
+                lr_finder = model.lr_finder_dataloader(self.train, tolerance=3)
+                best_lr = lr_finder.get_best_lr()
+                model.optimizer.set_lr(best_lr / 3)
                 log = model.fit_dataloader(self.train, epochs=self.cfg.n_ep, callbacks=[tt.callbacks.EarlyStopping()],
                                            val_dataloader=self.val, verbose=verbose)
             else:
+                lr_finder = model.lr_finder(*self.train, tolerance=3)
+                best_lr = lr_finder.get_best_lr()
+                model.optimizer.set_lr(best_lr / 3)
                 log = model.fit(*self.train, epochs=self.cfg.n_ep, callbacks=[tt.callbacks.EarlyStopping()],
                                 val_data=self.val, verbose=verbose)
             history = log.to_pandas()
@@ -167,10 +173,10 @@ class PyTorchTrainer(PyCoxTrainer):
 
     def preprocess(self, dataset: str):
         # Data loading (train/valid)
-        train_loader, val_loader = get_TDSA_dataloader(dataset=dataset, seq_len=self.cfg.seq_len)
+        train_loader, val_loader = get_TDSA_dataloader(dataset=dataset, seq_len=self.cfg.seq_len, random_state=self.cfg.random_state)
 
         x_test, durations_test, events_test, test_ds = get_test_TDSA_data(dataset=dataset,
-                                                                          seq_len=self.cfg.seq_len)  # get test data
+                                                                          seq_len=self.cfg.seq_len, random_state=self.cfg.random_state)  # get test data
 
         labtrans = getattr(train_loader.dataset, 'labtrans', None)
         taus = train_loader.dataset.taus
@@ -193,6 +199,7 @@ class PyTorchTrainer(PyCoxTrainer):
 
         self.cfg.net_kwargs['n_features'] = train_ds.n_features + 1  # +1 for time features
         self.cfg.net_kwargs['output_size'] = 1  # each time step has single node (=sigmoid)
+        self.cfg.net_kwargs['n_durations'] = self.cfg.seq_len if self.cfg.time_range == 'full' else self.cfg.seq_len + 2
         self.cfg.net_kwargs['embeddings'] = embeddings
         net = self.net_class(**self.cfg.net_kwargs)
         net.to(self.cfg.device)

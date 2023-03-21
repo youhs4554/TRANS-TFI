@@ -33,7 +33,7 @@ class Config(EasyDict):
         assert cls.model_name in BASELINE_MODEL_FAMILY + TDSA_MODEL_LIST
 
         cls.lr = 1e-3  # learning rate
-        cls.weight_decay = 1e-4  # weight decay strength
+        cls.weight_decay = 0.0  # weight decay strength
         cls.seq_len = 20  # default length
         if cls.time_range == 'truncated':
             cls.seq_len = 3

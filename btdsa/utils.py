@@ -4,6 +4,7 @@ import time
 from collections import defaultdict
 
 import numpy as np
+import pandas as pd
 import scipy.stats as st
 import torch
 from pycox.evaluation import EvalSurv
@@ -61,14 +62,16 @@ def bootstrap_eval(model, x_test, durations_test, events_test, et_train, taus, h
     nb_samples = len(x_test)
     result_dict = defaultdict(list)  # C-td(IPCW)/Brier/AUC of 25%,50%,75% horizons
 
-    def resample():
-        indices = np.random.choice(range(nb_samples), nb_samples, replace=True)
-        return x_test[indices], durations_test[indices], events_test[indices]
+    def resample(i):
+        x_test_res = pd.DataFrame(x_test).sample(nb_samples, replace=True, random_state=i)
+        durations_test_res = pd.Series(durations_test).iloc[x_test_res.index]
+        events_test_res = pd.Series(events_test).loc[x_test_res.index]
+        return x_test_res.values, durations_test_res.values, events_test_res.values
 
     for i in range(nb_bootstrap):
-        x_test_res, durations_test_res, events_test_res = resample()
+        x_test_res, durations_test_res, events_test_res = resample(i)
         if interpolate_discrete_times:
-            surv = model.interpolate(100).predict_surv_df(x_test_res)
+            surv = model.predict_surv_df(x_test_res)
         else:
             surv = model.predict_surv_df(x_test_res)
         ev = EvalSurv(surv, durations_test_res, events_test_res, censor_surv='km')

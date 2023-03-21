@@ -1,13 +1,15 @@
 import numpy as np
+import pandas as pd
 import torch
 from pycox.preprocessing import label_transforms
 import pycox.datasets as dt
+from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 from sklearn_pandas import DataFrameMapper
 from torch.utils.data import Dataset, DataLoader
 
 
-def load_data(dataset):
+def load_data(dataset, random_state=1234):
     if dataset == 'support':
         cols_standardize = ['x0', 'x7', 'x8', 'x9', 'x10', 'x11', 'x12', 'x13']
         cols_leave = ['x1', 'x2', 'x3', 'x4', 'x5', 'x6']
@@ -24,11 +26,20 @@ def load_data(dataset):
 
     # Split train/val/test
     df_full = eval(f'dt.{dataset}.read_df()')
+    df_feats = df_full.drop(cols_tgt, axis=1)
+    df_labels = df_full[cols_tgt]
+
+    df_feats_standardize = df_feats[cols_standardize]
+    df_feats_standardize_disc = StandardScaler().fit_transform(df_feats_standardize)
+    df_feats_standardize_disc = pd.DataFrame(df_feats_standardize_disc, columns=cols_standardize)
+
+    df_feats = pd.concat([df_feats[cols_leave], df_feats_standardize_disc], axis=1)
+    df_full = pd.concat([df_feats, df_labels], axis=1)
     max_duration_idx = df_full["duration"].argmax()
-    df_test = df_full.drop(max_duration_idx).sample(frac=0.3)
-    df_train = df_full.drop(df_test.index)
-    df_val = df_train.sample(frac=0.1)
-    df_train = df_train.drop(df_val.index)
+    df_full = df_full.drop(max_duration_idx)
+
+    df_train, df_test = train_test_split(df_full, test_size=0.3, random_state=random_state, stratify=df_full['event'])
+    df_train, df_val  = train_test_split(df_train, test_size=0.1, random_state=random_state, stratify=df_train['event'])
 
     # Target info
     y_train = df_train[cols_tgt].values
@@ -44,24 +55,18 @@ def load_data(dataset):
     df_val = df_val.drop(cols_tgt, axis=1)
     df_test = df_test.drop(cols_tgt, axis=1)
 
-    # Input data preprocessing
-    standardize = [([col], StandardScaler()) for col in cols_standardize]
-    leave = [(col, None) for col in cols_leave]
-
-    # assume categorical columns located first (for embedding later)
-    x_mapper = DataFrameMapper(leave + standardize)
-    x_train = x_mapper.fit_transform(df_train).astype('float32')
-    x_val = x_mapper.transform(df_val).astype('float32')
-    x_test = x_mapper.transform(df_test).astype('float32')
+    x_train = df_train.values
+    x_val = df_val.values
+    x_test = df_test.values
 
     return x_train, x_val, x_test, y_train, y_val, y_test, df_train_raw, df_val_raw, df_test_raw, df_full, cols_standardize, cols_leave
 
 
 class TDSADataset(Dataset):
-    def __init__(self, dataset, seq_len=20, phase='train'):
+    def __init__(self, dataset, seq_len=20, phase='train', random_state=1234):
         super().__init__()
 
-        x_train, x_val, x_test, y_train, y_val, y_test, df_train_raw, df_val_raw, df_test_raw, df_full, cols_standardize, cols_leave = load_data(dataset)
+        x_train, x_val, x_test, y_train, y_val, y_test, df_train_raw, df_val_raw, df_test_raw, df_full, cols_standardize, cols_leave = load_data(dataset, random_state=random_state)
 
         self.cols_standardize = cols_standardize
         self.cols_leave = cols_leave
@@ -121,17 +126,13 @@ class TDSADataset(Dataset):
         x = torch.from_numpy(self.X[ix])
         y = torch.from_numpy(self.Y[ix])
 
-        # Add time features on tiled covariates
-        xs = x.tile(self.seq_len, 1)
-        t = torch.arange(self.seq_len).unsqueeze(1) / self.seq_len
-        xs = torch.cat((xs, t), dim=1)
-        return xs, y
+        return x, y
 
     def __len__(self):
         return len(self.X)
 
 
-def get_TDSA_dataloader(dataset: str, seq_len: int = 20, batch_size: int = 64):
+def get_TDSA_dataloader(dataset: str, seq_len: int = 20, batch_size: int = 64, random_state: int = 1234):
     """
     :param dataset: name of dataset
     :param seq_len: maximum sequence length
@@ -139,8 +140,8 @@ def get_TDSA_dataloader(dataset: str, seq_len: int = 20, batch_size: int = 64):
     :return: tuple of (train_loader, valid_loader)
     """
 
-    train_ds = TDSADataset(dataset, seq_len=seq_len, phase='train')
-    val_ds = TDSADataset(dataset, seq_len=seq_len, phase='val')
+    train_ds = TDSADataset(dataset, seq_len=seq_len, phase='train', random_state=random_state)
+    val_ds = TDSADataset(dataset, seq_len=seq_len, phase='val', random_state=random_state)
 
     train_loader = DataLoader(train_ds, batch_size=batch_size, shuffle=True)
     val_loader = DataLoader(val_ds, batch_size=batch_size, shuffle=False)
@@ -148,8 +149,8 @@ def get_TDSA_dataloader(dataset: str, seq_len: int = 20, batch_size: int = 64):
     return train_loader, val_loader
 
 
-def get_test_TDSA_data(dataset: str, seq_len: int = 20):
-    test_ds = TDSADataset(dataset=dataset, seq_len=seq_len, phase='test')
+def get_test_TDSA_data(dataset: str, seq_len: int = 20, random_state: int = 1234):
+    test_ds = TDSADataset(dataset=dataset, seq_len=seq_len, phase='test', random_state=random_state)
 
     # Evaluation
     x_test = []

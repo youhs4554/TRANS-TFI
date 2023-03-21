@@ -3,6 +3,7 @@ from sklearn.preprocessing import KBinsDiscretizer, LabelEncoder, StandardScaler
 import numpy as np
 import pandas as pd
 import pdb
+from sklearn.model_selection import train_test_split
 
 from .utils import LabelTransform
 
@@ -11,6 +12,7 @@ def load_data(config):
     '''
     data = config['data']
     horizons = config['horizons']
+    random_state = config['seed']
     assert data in ["metabric", "nwtco", "support", "gbsg", "flchain", "seer",], "Data Not Found!"
     get_target = lambda df: (df['duration'].values, df['event'].values)
 
@@ -39,13 +41,18 @@ def load_data(config):
                 
         # get the largest duraiton time
         max_duration_idx = df["duration"].argmax()
-        df_test = df_feat.drop(max_duration_idx).sample(frac=0.3)
-        df_train = df_feat.drop(df_test.index)
-        df_val = df_train.drop(max_duration_idx).sample(frac=0.1)
-        df_train = df_train.drop(df_val.index)
+        df_feat = df_feat.drop(max_duration_idx)
+        df_label = df[["duration","event"]].drop(max_duration_idx)
+        df_full = pd.concat([df_feat, df_label],axis=1)
+        df_train, df_test = train_test_split(df_full, test_size=0.3, random_state=random_state, stratify=df_full['event'])
+        df_train, df_val  = train_test_split(df_train, test_size=0.1, random_state=random_state, stratify=df_train['event'])
+
+        df_train = df_train.drop(["duration", "event"],axis=1)
+        df_val = df_val.drop(["duration", "event"],axis=1)
+        df_test = df_test.drop(["duration", "event"],axis=1)
 
         # assign cuts
-        labtrans = LabelTransform(cuts=np.array([df["duration"].min()]+times+[df["duration"].max()]))
+        labtrans = LabelTransform(cuts=np.array([0]+times+[df["duration"].max()]))
         labtrans.fit(*get_target(df.loc[df_train.index]))
         y = labtrans.transform(*get_target(df)) # y = (discrete duration, event indicator)
         df_y_train = pd.DataFrame({"duration": y[0][df_train.index], "event": y[1][df_train.index], "proportion": y[2][df_train.index]}, index=df_train.index)
@@ -73,10 +80,15 @@ def load_data(config):
 
         # get the largest duraiton time
         max_duration_idx = df["duration"].argmax()
-        df_test = df_feat.drop(max_duration_idx).sample(frac=0.3)
-        df_train = df_feat.drop(df_test.index)
-        df_val = df_train.drop(max_duration_idx).sample(frac=0.1)
-        df_train = df_train.drop(df_val.index)
+        df_feat = df_feat.drop(max_duration_idx)
+        df_label = df[["duration","event"]].drop(max_duration_idx)
+        df_full = pd.concat([df_feat, df_label],axis=1)
+        df_train, df_test = train_test_split(df_full, test_size=0.3, random_state=random_state, stratify=df_full['event'])
+        df_train, df_val  = train_test_split(df_train, test_size=0.1, random_state=random_state, stratify=df_train['event'])
+
+        df_train = df_train.drop(["duration", "event"],axis=1)
+        df_val = df_val.drop(["duration", "event"],axis=1)
+        df_test = df_test.drop(["duration", "event"],axis=1)
 
         # assign cuts
         # labtrans = LabTransDiscreteTime(cuts=np.array([0]+times+[df["duration"].max()]))
@@ -110,10 +122,15 @@ def load_data(config):
 
         # get the largest duraiton time
         max_duration_idx = df["duration"].argmax()
-        df_test = df_feat.drop(max_duration_idx).sample(frac=0.3)
-        df_train = df_feat.drop(df_test.index)
-        df_val = df_train.drop(max_duration_idx).sample(frac=0.1)
-        df_train = df_train.drop(df_val.index)
+        df_feat = df_feat.drop(max_duration_idx)
+        df_label = df[["duration","event"]].drop(max_duration_idx)
+        df_full = pd.concat([df_feat, df_label],axis=1)
+        df_train, df_test = train_test_split(df_full, test_size=0.3, random_state=random_state, stratify=df_full['event'])
+        df_train, df_val  = train_test_split(df_train, test_size=0.1, random_state=random_state, stratify=df_train['event'])
+
+        df_train = df_train.drop(["duration", "event"],axis=1)
+        df_val = df_val.drop(["duration", "event"],axis=1)
+        df_test = df_test.drop(["duration", "event"],axis=1)
 
         # assign cuts
         # labtrans = LabTransDiscreteTime(cuts=np.array([0]+times+[df["duration"].max()]))
@@ -157,10 +174,15 @@ def load_data(config):
         
         # get the largest duraiton time
         max_duration_idx = df["duration"].argmax()
-        df_test = df_feat.drop(max_duration_idx).sample(frac=0.3)
-        df_train = df_feat.drop(df_test.index)
-        df_val = df_train.drop(max_duration_idx).sample(frac=0.1)
-        df_train = df_train.drop(df_val.index)
+        df_feat = df_feat.drop(max_duration_idx)
+        df_label = df[["duration","event"]].drop(max_duration_idx)
+        df_full = pd.concat([df_feat, df_label],axis=1)
+        df_train, df_test = train_test_split(df_full, test_size=0.3, random_state=random_state, stratify=df_full['event'])
+        df_train, df_val  = train_test_split(df_train, test_size=0.1, random_state=random_state, stratify=df_train['event'])
+
+        df_train = df_train.drop(["duration", "event"],axis=1)
+        df_val = df_val.drop(["duration", "event"],axis=1)
+        df_test = df_test.drop(["duration", "event"],axis=1)
 
         # assign cuts
         labtrans = LabelTransform(cuts=np.array([0]+times+[df["duration"].max()]))

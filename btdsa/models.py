@@ -7,7 +7,7 @@ from pycox.models.interpolation import InterpolateLogisticHazard
 from pycox.models.utils import pad_col
 import torchtuples as tt
 
-def get_embeddings(n_embeddings: List, embedding_size: int = 50, device=None):
+def get_embeddings(n_embeddings: List, embedding_size: int = 16, device=None):
     """
     Get embeddings (look-up matrix) for categorical features
     :param n_embeddings: list composed with rows of embedding matrix
@@ -33,6 +33,7 @@ class TDSA(nn.Module):
             n_features: int,
             hidden_dim: int,
             n_layers: int,
+            n_durations: int,
             embeddings: List[nn.Embedding],
             output_size: int = 1,
             bidirectional: bool = True
@@ -60,6 +61,7 @@ class TDSA(nn.Module):
         self.n_features = n_features
         self.n_layers = n_layers
         self.hidden_dim = hidden_dim
+        self.n_durations = n_durations
 
         # embeddings
         self.embeddings = embeddings
@@ -93,12 +95,19 @@ class TDSA(nn.Module):
             - the DRSA model's predictions at each time step, for each observation in batch
             - out is of shape (batch_size, sequence_length, 1)
         """
+        # Add time features on tiled covariates
+        X = X.unsqueeze(1).tile(1, self.n_durations, 1)
+
         # concatenating embedding and numeric features
         all_embeddings = [
             emb(X[:, :, i].long()) for i, emb in enumerate(self.embeddings)
         ]
         other_features = X[:, :, len(self.embeddings):]
         all_features = torch.cat(all_embeddings + [other_features.float()], dim=-1)
+
+        t = torch.arange(self.n_durations).unsqueeze(1).unsqueeze(0) / (self.n_durations-1)
+        t = t.tile(X.shape[0], 1, 1)
+        all_features = torch.cat((all_features, t), dim=-1)
 
         # passing input and hidden into model (hidden initialized as zeros)
         out, hidden = self.lstm(all_features.float())
