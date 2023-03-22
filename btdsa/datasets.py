@@ -8,6 +8,8 @@ from sklearn.preprocessing import StandardScaler
 from sklearn_pandas import DataFrameMapper
 from torch.utils.data import Dataset, DataLoader
 
+from SurvTRACE.survtrace.utils import LabelTransform
+
 
 def load_data(dataset, random_state=1234):
     if dataset == 'support':
