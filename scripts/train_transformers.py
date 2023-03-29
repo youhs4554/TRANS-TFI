@@ -26,7 +26,7 @@ import prettytable as pt
 
 DATASETS = ['gbsg', 'metabric', 'flchain']
 
-from btdsa.utils import create_logger
+from baselines.utils import create_logger
 
 logger = create_logger('./logs_survtrace')
 
@@ -38,7 +38,11 @@ results = []
 
 def run_experiment(dataset, custom_training=True, show_plot=False):
     assert dataset in DATASETS
-    logger.info(f"[SurvTrace@{dataset}] custom_training={custom_training}")
+    if custom_training:
+        model_name = "TRANS-TFI"
+    else:
+        model_name = "SurvTrace"
+    logger.info(f"Training {model_name}@{dataset}...")
 
     # define the setup parameters
     STConfig.data = dataset
@@ -49,7 +53,7 @@ def run_experiment(dataset, custom_training=True, show_plot=False):
     if STConfig['custom_training']:
         metrics = [LossTDSurv(), ]
 
-    seed = STConfig.seed  # 1234
+    seed = STConfig.seed
     set_random_seed(seed)
 
     hparams = {
@@ -115,7 +119,12 @@ def fit_report(custom_training):
     for dataset in DATASETS:
         run_experiment(dataset, custom_training=custom_training, show_plot=False)
 
-    tb = pt.PrettyTable(title=f"SurvTrace(custom_training={custom_training})")
+    if custom_training:
+        title = "TRANS-TFI"
+    else:
+        title = "SurvTrace"
+
+    tb = pt.PrettyTable(title=title)
     tb.field_names = headers
     tb.add_row(results)
     logger.info(tb)

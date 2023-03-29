@@ -1,2 +1,2 @@
-# BTDSA
-BTDSA: Bidirectional Time Dependent Survival Analysis
+# TRANS-TFI
+TRANS-TFI: Transformers for Time Feature Injection in Survival Analysis

@@ -1,59 +1,14 @@
-import logging
-import os
-import time
 from collections import defaultdict
 
 import numpy as np
 import pandas as pd
-import scipy.stats as st
+import prettytable as pt
 import torch
 from pycox.evaluation import EvalSurv
-from pycox import utils
-from sksurv.metrics import concordance_index_ipcw, brier_score, cumulative_dynamic_auc
+from sksurv.metrics import brier_score, concordance_index_ipcw, cumulative_dynamic_auc
 
-
-def seed_everything(random_state=1234):
-    """
-    Fix randomness for deterministic results
-    :param random_state: random state generating random numbers
-    :return: None
-    """
-
-    np.random.seed(random_state)
-    _ = torch.manual_seed(random_state)
-    torch.cuda.manual_seed(random_state)
-    torch.cuda.manual_seed_all(random_state)  # multi-GPU
-
-
-def create_logger(logs_dir):
-    ''' Performs creating logger
-    :param logs_dir: (String) the path of logs
-    :return logger: (logging object)
-    '''
-    os.makedirs(logs_dir, exist_ok=True)
-    # logs settings
-    log_file = os.path.join(logs_dir,
-                            time.strftime('%Y-%m-%d-%H-%M-%S', time.localtime(time.time())) + '.log')
-
-    # initialize logger
-    logger = logging.getLogger(__name__)
-    logger.setLevel(level=logging.INFO)
-
-    # initialize handler
-    handler = logging.FileHandler(log_file)
-    handler.setLevel(logging.INFO)
-    handler.setFormatter(
-        logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
-
-    # initialize console
-    console = logging.StreamHandler()
-    console.setLevel(logging.INFO)
-
-    # builds logger
-    logger.addHandler(handler)
-    logger.addHandler(console)
-
-    return logger
+from baselines.train_utils import get_target
+from pycox.utils import idx_at_times
 
 
 @torch.no_grad()
@@ -78,7 +33,7 @@ def bootstrap_eval(model, x_test, durations_test, events_test, et_train, taus, h
         cindex = ev.concordance_td('antolini')
         result_dict['C-td-full'].append(cindex)
 
-        idx = utils.idx_at_times(surv.index, taus, 'post')
+        idx = idx_at_times(surv.index, taus, 'post')
         out_survival = surv.iloc[idx].T
         out_risk = 1.0 - out_survival
 
@@ -115,3 +70,56 @@ def bootstrap_eval(model, x_test, durations_test, events_test, et_train, taus, h
         upper = min(1.0, np.percentile(stats, p2))
         confi_dict[k] = [(upper + lower) / 2, (upper - lower) / 2]
     return confi_dict
+
+
+class Evaluator:
+    def __init__(self, trainer=None):
+        self.trainer = trainer
+        self.headers = []
+        self.results = []
+
+    def evaluate(self, x_test, y_test):
+        durations_test, events_test = y_test.T
+
+        assert hasattr(self.trainer, "trained_model"), "You need to fit() model first. The model is not fitted yet!"
+
+        t_train, e_train = get_target(self.trainer.df_train_raw)
+        et_train = np.array([(e_train[i], t_train[i]) for i in range(len(e_train))],
+                            dtype=[('e', bool), ('t', float)])
+        taus = self.trainer.taus
+        horizons = self.trainer.cfg.horizons
+
+        # bootstrap evaluation
+        result_dict = bootstrap_eval(self.trainer.trained_model, x_test, durations_test, events_test, et_train,
+                                     taus, horizons,
+                                     interpolate_discrete_times=self.trainer.interpolate_discrete_times,
+                                     nb_bootstrap=self.trainer.cfg.nb_bootstrap)
+
+        # for beautified result table
+        self.headers.append(self.trainer.dataset)
+
+        cindex_avg, cindex_interval = result_dict.pop('C-td-full')
+        row_str = f"C-td (full): {cindex_avg:.4f} ({cindex_interval:.4f})\n"
+
+        for horizon in horizons:
+            keys = [k for k in result_dict.keys() if k.startswith(str(horizon))]
+            results_at_horizon = [result_dict[k] for k in keys]
+            msg = [f"[{horizon * 100}%]"]
+            for k, res in zip(keys, results_at_horizon):
+                metric = k.split('_')[1]
+                avg, interval = res
+                msg.append(f"{metric}: {avg:.4f} ({interval:.4f})")
+            row_str += (" ".join(msg) + "\n")
+        self.results.append(row_str)
+
+    def report(self):
+        cfg = self.trainer.cfg
+        if self.trainer.interpolate_discrete_times:
+            title = f"{cfg.model_name}({cfg.time_range}, L={cfg.seq_len})"
+        else:
+            title = cfg.model_name
+
+        tb = pt.PrettyTable(title=title)
+        tb.field_names = self.headers
+        tb.add_row(self.results)
+        self.trainer.logger.info(tb)

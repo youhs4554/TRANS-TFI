@@ -10,16 +10,9 @@ BASELINE_MODEL_FAMILY = [
     "CoxPH", "PCHazard",
 ]
 
-TDSA_MODEL_LIST = [
-    # Deep Recurrent Survival Analysis model (paper: https://arxiv.org/abs/1809.02403)
-    "DRSA",
-    # Our proposed model (BTDSA: Bidirectional Time Dependent Survival Analysis)
-    "BTDSA"
-]
-
 
 class Config(EasyDict):
-    model_name = 'BTDSA'  # which model to use
+    model_name = 'DeepHitSingle'  # which model to use
     time_range = 'full'  # valid only for discrete-time models (options: full | truncated)
     random_state = 1234  # static random state for deterministic results
     n_ep = 3000  # number of epochs
@@ -30,7 +23,7 @@ class Config(EasyDict):
         cls.horizons = [.25, .5, .75]  # truncated time horizons 25%, 50%, 75%
         cls.list_of_datasets = ['gbsg', 'metabric', 'flchain']  # name of dataset
 
-        assert cls.model_name in BASELINE_MODEL_FAMILY + TDSA_MODEL_LIST
+        assert cls.model_name in BASELINE_MODEL_FAMILY
 
         cls.lr = 1e-3  # learning rate
         cls.weight_decay = 0.0  # weight decay strength
@@ -48,7 +41,8 @@ class Config(EasyDict):
             cls.sigma = 0.1  # used in ranking loss
 
         # if true, interpolate discrete-time model outputs for evaluation
-        cls.interpolate_discrete_times = (cls.model_name in ['DeepHitSingle', 'LogisticHazard', 'PMF', 'MTLR', 'BCESurv']) and (cls.time_range == 'full')
+        cls.interpolate_discrete_times = (cls.model_name in ['DeepHitSingle', 'LogisticHazard', 'PMF', 'MTLR',
+                                                             'BCESurv']) and (cls.time_range == 'full')
 
         if not torch.backends.mps.is_available():
             cls.device = 'cuda:0' if torch.cuda.is_available() else 'cpu'  # Apple's M1 mac setup
@@ -63,13 +57,6 @@ class Config(EasyDict):
                 batch_norm=True,
                 dropout=0.1,
                 output_bias=False
-            )
-        elif cls.model_name in ['BTDSA', 'DRSA']:
-            use_BTDSA = (cls.model_name == 'BTDSA')
-            cls.net_kwargs = dict(
-                hidden_dim=64,
-                n_layers=3,  # number of LSTM layer(s)
-                bidirectional=use_BTDSA
             )
         else:
             raise NotImplementedError(f"Unsupported model_name={cls.model_name}")
