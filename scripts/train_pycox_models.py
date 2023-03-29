@@ -1,9 +1,11 @@
 import warnings
+from itertools import product
+
 warnings.filterwarnings('ignore')
 
 import os, sys
 sys.path.append(os.path.abspath('../btdsa'))
-from btdsa.config import Config
+from btdsa.config import Config, BASELINE_MODEL_FAMILY
 from btdsa.eval_utils import EvalSurv
 from btdsa.train_utils import init_trainer
 from btdsa.utils import create_logger
@@ -30,11 +32,8 @@ def run_experiment(model_name, time_range='full'):
         ev.evaluate(surv, x_test, y_test)
     ev.report()  # log and report results in beautiful tables
 
-# # Comparison with Baselines; CoxPH(=DeepSurv), DeepHitSingle
-# run_experiment('CoxPH')
-# run_experiment('DeepHitSingle', time_range='full')
-# run_experiment('DeepHitSingle', time_range='truncated')
-#
-# # Ours : Bidirectional Time Dependent Survival Analysis (BTDSA)
-# run_experiment('BTDSA', time_range='full')
-run_experiment('BTDSA', time_range='truncated')
+# Comparison with Baselines; CoxPH(=DeepSurv), DeepHitSingle
+for model_name, time_range in product(BASELINE_MODEL_FAMILY, ["full", "truncated"]):
+    if model_name == 'PCHazard' and time_range == 'truncated':
+        continue
+    run_experiment(model_name, time_range)

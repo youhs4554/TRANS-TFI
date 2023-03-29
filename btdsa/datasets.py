@@ -12,9 +12,9 @@ from SurvTRACE.survtrace.utils import LabelTransform
 
 
 def load_data(dataset, random_state=1234):
-    if dataset == 'support':
-        cols_standardize = ['x0', 'x7', 'x8', 'x9', 'x10', 'x11', 'x12', 'x13']
-        cols_leave = ['x1', 'x2', 'x3', 'x4', 'x5', 'x6']
+    if dataset == 'flchain':
+        cols_standardize = ['age', 'creatinine', 'kappa', 'lambda']
+        cols_leave = ['sex', 'sample.yr', 'mgus', 'flc.grp']
     elif dataset == 'metabric':
         cols_standardize = ['x0', 'x1', 'x2', 'x3', 'x8']
         cols_leave = ['x4', 'x5', 'x6', 'x7']
@@ -28,6 +28,9 @@ def load_data(dataset, random_state=1234):
 
     # Split train/val/test
     df_full = eval(f'dt.{dataset}.read_df()')
+    if dataset == 'flchain':
+        df_full.rename({'futime': 'duration', 'death': 'event'}, axis=1, inplace=True)
+        df_full = df_full.astype('float32')
     df_feats = df_full.drop(cols_tgt, axis=1)
     df_labels = df_full[cols_tgt]
 
@@ -38,10 +41,10 @@ def load_data(dataset, random_state=1234):
     df_feats = pd.concat([df_feats[cols_leave], df_feats_standardize_disc], axis=1)
     df_full = pd.concat([df_feats, df_labels], axis=1)
     max_duration_idx = df_full["duration"].argmax()
-    df_full = df_full.drop(max_duration_idx)
-
-    df_train, df_test = train_test_split(df_full, test_size=0.3, random_state=random_state, stratify=df_full['event'])
-    df_train, df_val  = train_test_split(df_train, test_size=0.1, random_state=random_state, stratify=df_train['event'])
+    df_test = df_full.drop(max_duration_idx).sample(frac=0.3, random_state=random_state)
+    df_train = df_full.drop(df_test.index)
+    df_val = df_train.drop(max_duration_idx).sample(frac=0.1, random_state=random_state)
+    df_train = df_train.drop(df_val.index)
 
     # Target info
     y_train = df_train[cols_tgt].values

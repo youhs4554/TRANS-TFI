@@ -90,7 +90,7 @@ class Evaluator:
 
         return metric_dict
 
-    def eval(self, model, test_set, confidence=None, val_batch_size=None, nb_bootstrap=100):
+    def eval(self, model, test_set, confidence=None, val_batch_size=None, nb_bootstrap=10):
         '''do evaluation.
         if confidence is not None, it should be in (0, 1) and the confidence
         interval will be given by bootstrapping.
@@ -109,7 +109,7 @@ class Evaluator:
             # do bootstrapping
             stats_dict = defaultdict(list)
             for i in range(nb_bootstrap):
-                df_test = test_set[0].sample(test_set[0].shape[0], replace=True, random_state=i)
+                df_test = test_set[0].sample(test_set[0].shape[0], replace=True)
                 df_y_test = test_set[1].loc[df_test.index]
 
                 if model.config['num_event'] > 1:
@@ -123,12 +123,12 @@ class Evaluator:
             metric_dict = {}
             # compute confidence interveal 95%
             alpha = confidence
+            p1 = ((1 - alpha) / 2) * 100
+            p2 = (alpha + ((1.0 - alpha) / 2.0)) * 100
             for k in stats_dict.keys():
                 stats = stats_dict[k]
-                mean = np.mean(stats)
-                ci = st.t.interval(alpha, len(stats) - 1, loc=mean, scale=st.sem(stats))  # 95% CI
-                metric_dict[k] = (mean, ci)
-                print(f'{alpha} confidence {k} average:', mean)
-                print(f'{alpha} confidence {k} interval: ({ci[0]},{ci[1]})')
+                lower = max(0, np.percentile(stats, p1))
+                upper = min(1.0, np.percentile(stats, p2))
+                metric_dict[k] = [(upper + lower) / 2, (upper - lower) / 2]
 
             return metric_dict

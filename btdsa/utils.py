@@ -62,16 +62,16 @@ def bootstrap_eval(model, x_test, durations_test, events_test, et_train, taus, h
     nb_samples = len(x_test)
     result_dict = defaultdict(list)  # C-td(IPCW)/Brier/AUC of 25%,50%,75% horizons
 
-    def resample(i):
-        x_test_res = pd.DataFrame(x_test).sample(nb_samples, replace=True, random_state=i)
+    def resample():
+        x_test_res = pd.DataFrame(x_test).sample(nb_samples, replace=True)
         durations_test_res = pd.Series(durations_test).iloc[x_test_res.index]
         events_test_res = pd.Series(events_test).loc[x_test_res.index]
         return x_test_res.values, durations_test_res.values, events_test_res.values
 
     for i in range(nb_bootstrap):
-        x_test_res, durations_test_res, events_test_res = resample(i)
+        x_test_res, durations_test_res, events_test_res = resample()
         if interpolate_discrete_times:
-            surv = model.predict_surv_df(x_test_res)
+            surv = model.interpolate(100).predict_surv_df(x_test_res)
         else:
             surv = model.predict_surv_df(x_test_res)
         ev = EvalSurv(surv, durations_test_res, events_test_res, censor_surv='km')
@@ -105,9 +105,13 @@ def bootstrap_eval(model, x_test, durations_test, events_test, et_train, taus, h
             result_dict[k].append(metric_dict[k])
 
     confi_dict = {}
+    # compute confidence interveal 95%
+    alpha = 0.95
+    p1 = ((1 - alpha) / 2) * 100
+    p2 = (alpha + ((1.0 - alpha) / 2.0)) * 100
     for k in result_dict.keys():
         stats = result_dict[k]
-        mean = np.mean(stats)
-        ci_95 = st.t.interval(0.95, len(stats) - 1, loc=mean, scale=st.sem(stats))  # 95% CI
-        confi_dict[k] = (mean, ci_95)
+        lower = max(0, np.percentile(stats, p1))
+        upper = min(1.0, np.percentile(stats, p2))
+        confi_dict[k] = [(upper + lower) / 2, (upper - lower) / 2]
     return confi_dict

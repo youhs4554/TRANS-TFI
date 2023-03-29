@@ -7,7 +7,7 @@ BASELINE_MODEL_FAMILY = [
     # Discrete-Time Models,
     "DeepHitSingle", "LogisticHazard", "LogisticHazard", "PMF", "MTLR", "BCESurv",
     # Continuous-Time Models
-    "CoxPH", "PCHazard", "CoxTime", "CoxCC"
+    "CoxPH", "PCHazard",
 ]
 
 TDSA_MODEL_LIST = [
@@ -21,14 +21,14 @@ TDSA_MODEL_LIST = [
 class Config(EasyDict):
     model_name = 'BTDSA'  # which model to use
     time_range = 'full'  # valid only for discrete-time models (options: full | truncated)
-    random_state = 42  # static random state for deterministic results
+    random_state = 1234  # static random state for deterministic results
     n_ep = 3000  # number of epochs
     model_save_dir = Path('./model_dir')
 
     @classmethod
     def setup(cls):
         cls.horizons = [.25, .5, .75]  # truncated time horizons 25%, 50%, 75%
-        cls.list_of_datasets = ['gbsg', 'metabric', 'support']  # name of dataset
+        cls.list_of_datasets = ['gbsg', 'metabric', 'flchain']  # name of dataset
 
         assert cls.model_name in BASELINE_MODEL_FAMILY + TDSA_MODEL_LIST
 
@@ -39,8 +39,8 @@ class Config(EasyDict):
             cls.seq_len = 3
         cls.show_plot = False  # if true, plot learning curves
         cls.silent_fit = True  # if true, do not show training progress
-        cls.nb_bootstrap = 100  # number of bootstrap evaluations
-        cls.es_patience = 10
+        cls.nb_bootstrap = 10  # number of bootstrap evaluations
+        cls.es_patience = 5
 
         if cls.model_name == "DeepHitSingle":
             # Used for DeepHit loss

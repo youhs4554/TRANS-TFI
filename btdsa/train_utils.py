@@ -125,7 +125,7 @@ class PyCoxTrainer:
             model.training_data = self.train
 
         if fitting:
-            self.logger.info(f"Running {dataset}...")
+            self.logger.info(f"[{self.cfg.model_name}@{dataset}] time_range={self.cfg.time_range}, L={self.cfg.seq_len}, interpolate={self.interpolate_discrete_times}")
             verbose = False if self.cfg.silent_fit else True
             es_patience = self.cfg.es_patience
 

@@ -31,8 +31,8 @@ class EvalSurv:
         # for beautified result table
         self.headers.append(self.trainer.dataset)
 
-        cindex_mean, (cindex_lower, cindex_upper) = result_dict.pop('C-td-full')
-        row_str = f"C-td (full): {cindex_mean:.6f} ({cindex_lower:.6f},{cindex_upper:.6f})\n"
+        cindex_avg, cindex_interval = result_dict.pop('C-td-full')
+        row_str = f"C-td (full): {cindex_avg:.4f} ({cindex_interval:.4f})\n"
 
         for horizon in horizons:
             keys = [ k for k in result_dict.keys() if k.startswith(str(horizon)) ]
@@ -40,8 +40,8 @@ class EvalSurv:
             msg = [f"[{horizon*100}%]"]
             for k,res in zip(keys,results_at_horizon):
                 metric = k.split('_')[1]
-                mean, (lower, upper) = res
-                msg.append(f"{metric}: {mean:.6f} ({lower:.6f},{upper:.6f})")
+                avg, interval = res
+                msg.append(f"{metric}: {avg:.4f} ({interval:.4f})")
             row_str += (" ".join(msg) + "\n")
         self.results.append(row_str)
 

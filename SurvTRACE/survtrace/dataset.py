@@ -1,19 +1,19 @@
 from pycox.datasets import metabric, nwtco, support, gbsg, flchain
+from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import KBinsDiscretizer, LabelEncoder, StandardScaler
 import numpy as np
 import pandas as pd
 import pdb
-from sklearn.model_selection import train_test_split
 
 from .utils import LabelTransform
+
 
 def load_data(config):
     '''load data, return updated configuration.
     '''
     data = config['data']
     horizons = config['horizons']
-    random_state = config['seed']
-    assert data in ["metabric", "nwtco", "support", "gbsg", "flchain", "seer",], "Data Not Found!"
+    assert data in ["metabric", "nwtco", "support", "gbsg", "flchain", "seer", ], "Data Not Found!"
     get_target = lambda df: (df['duration'].values, df['event'].values)
 
     if data == "metabric":
@@ -21,181 +21,179 @@ def load_data(config):
         df = metabric.read_df()
 
         # evaluate the performance at the 25th, 50th and 75th event time quantile
-        times = np.quantile(df["duration"][df["event"]==1.0], horizons).tolist()
+        times = np.quantile(df["duration"][df["event"] == 1.0], horizons).tolist()
 
         cols_categorical = ["x4", "x5", "x6", "x7"]
         cols_standardize = ['x0', 'x1', 'x2', 'x3', 'x8']
 
-        df_feat = df.drop(["duration","event"],axis=1)
-        df_feat_standardize = df_feat[cols_standardize] 
+        df_feat = df.drop(["duration", "event"], axis=1)
+        df_feat_standardize = df_feat[cols_standardize]
         df_feat_standardize_disc = StandardScaler().fit_transform(df_feat_standardize)
         df_feat_standardize_disc = pd.DataFrame(df_feat_standardize_disc, columns=cols_standardize)
 
         # must be categorical feature ahead of numerical features!
         df_feat = pd.concat([df_feat[cols_categorical], df_feat_standardize_disc], axis=1)
-        
+
         vocab_size = 0
-        for _,feat in enumerate(cols_categorical):
+        for _, feat in enumerate(cols_categorical):
             df_feat[feat] = LabelEncoder().fit_transform(df_feat[feat]).astype(float) + vocab_size
             vocab_size = df_feat[feat].max() + 1
-                
+
         # get the largest duraiton time
         max_duration_idx = df["duration"].argmax()
-        df_feat = df_feat.drop(max_duration_idx)
-        df_label = df[["duration","event"]].drop(max_duration_idx)
-        df_full = pd.concat([df_feat, df_label],axis=1)
-        df_train, df_test = train_test_split(df_full, test_size=0.3, random_state=random_state, stratify=df_full['event'])
-        df_train, df_val  = train_test_split(df_train, test_size=0.1, random_state=random_state, stratify=df_train['event'])
-
-        df_train = df_train.drop(["duration", "event"],axis=1)
-        df_val = df_val.drop(["duration", "event"],axis=1)
-        df_test = df_test.drop(["duration", "event"],axis=1)
+        df_test = df_feat.drop(max_duration_idx).sample(frac=0.3)
+        df_train = df_feat.drop(df_test.index)
+        df_val = df_train.drop(max_duration_idx).sample(frac=0.1)
+        df_train = df_train.drop(df_val.index)
 
         # assign cuts
-        labtrans = LabelTransform(cuts=np.array([0]+times+[df["duration"].max()]))
+        labtrans = LabelTransform(cuts=np.array([df["duration"].min()] + times + [df["duration"].max()]))
         labtrans.fit(*get_target(df.loc[df_train.index]))
-        y = labtrans.transform(*get_target(df)) # y = (discrete duration, event indicator)
-        df_y_train = pd.DataFrame({"duration": y[0][df_train.index], "event": y[1][df_train.index], "proportion": y[2][df_train.index]}, index=df_train.index)
-        df_y_val = pd.DataFrame({"duration": y[0][df_val.index], "event": y[1][df_val.index],  "proportion": y[2][df_val.index]}, index=df_val.index)
+        y = labtrans.transform(*get_target(df))  # y = (discrete duration, event indicator)
+        df_y_train = pd.DataFrame(
+            {"duration": y[0][df_train.index], "event": y[1][df_train.index], "proportion": y[2][df_train.index]},
+            index=df_train.index)
+        df_y_val = pd.DataFrame(
+            {"duration": y[0][df_val.index], "event": y[1][df_val.index], "proportion": y[2][df_val.index]},
+            index=df_val.index)
         # df_y_test = pd.DataFrame({"duration": y[0][df_test.index], "event": y[1][df_test.index],  "proportion": y[2][df_test.index]}, index=df_test.index)
-        df_y_test = pd.DataFrame({"duration": df['duration'].loc[df_test.index], "event": df['event'].loc[df_test.index]})
-    
-    elif data == "support":
-        df = support.read_df()
-        times = np.quantile(df["duration"][df["event"]==1.0], horizons).tolist()
-        cols_categorical = ["x1", "x2", "x3", "x4", "x5", "x6"]
-        cols_standardize = ['x0', 'x7', 'x8', 'x9', 'x10', 'x11', 'x12', 'x13']
+        df_y_test = pd.DataFrame(
+            {"duration": df['duration'].loc[df_test.index], "event": df['event'].loc[df_test.index]})
 
-        df_feat = df.drop(["duration","event"],axis=1)
-        df_feat_standardize = df_feat[cols_standardize]        
-        df_feat_standardize_disc = StandardScaler().fit_transform(df_feat_standardize)
-        df_feat_standardize_disc = pd.DataFrame(df_feat_standardize_disc, columns=cols_standardize)
-
-        df_feat = pd.concat([df_feat[cols_categorical], df_feat_standardize_disc], axis=1)
-        
-        vocab_size = 0
-        for i,feat in enumerate(cols_categorical):
-            df_feat[feat] = LabelEncoder().fit_transform(df_feat[feat]).astype(float) + vocab_size
-            vocab_size = df_feat[feat].max() + 1
-
-        # get the largest duraiton time
-        max_duration_idx = df["duration"].argmax()
-        df_feat = df_feat.drop(max_duration_idx)
-        df_label = df[["duration","event"]].drop(max_duration_idx)
-        df_full = pd.concat([df_feat, df_label],axis=1)
-        df_train, df_test = train_test_split(df_full, test_size=0.3, random_state=random_state, stratify=df_full['event'])
-        df_train, df_val  = train_test_split(df_train, test_size=0.1, random_state=random_state, stratify=df_train['event'])
-
-        df_train = df_train.drop(["duration", "event"],axis=1)
-        df_val = df_val.drop(["duration", "event"],axis=1)
-        df_test = df_test.drop(["duration", "event"],axis=1)
-
-        # assign cuts
-        # labtrans = LabTransDiscreteTime(cuts=np.array([0]+times+[df["duration"].max()]))
-        labtrans = LabelTransform(cuts=np.array([0]+times+[df["duration"].max()]))
-
-        labtrans.fit(*get_target(df.loc[df_train.index]))
-        # y = labtrans.fit_transform(*get_target(df)) # y = (discrete duration, event indicator)
-        y = labtrans.transform(*get_target(df)) # y = (discrete duration, event indicator)
-        df_y_train = pd.DataFrame({"duration": y[0][df_train.index], "event": y[1][df_train.index], "proportion":y[2][df_train.index]}, index=df_train.index)
-        df_y_val = pd.DataFrame({"duration": y[0][df_val.index], "event": y[1][df_val.index], "proportion":y[2][df_val.index]}, index=df_val.index)
-        # df_y_test = pd.DataFrame({"duration": y[0][df_test.index], "event": y[1][df_test.index], "proportion":y[2][df_test.index]}, index=df_test.index)
-        df_y_test = pd.DataFrame({"duration": df['duration'].loc[df_test.index], "event": df['event'].loc[df_test.index]})
-        
     elif data == "gbsg":
         df = gbsg.read_df()
-        times = np.quantile(df["duration"][df["event"]==1.0], horizons).tolist()
+        times = np.quantile(df["duration"][df["event"] == 1.0], horizons).tolist()
         cols_categorical = ['x0', 'x1', 'x2']
         cols_standardize = ['x3', 'x4', 'x5', 'x6']
 
-        df_feat = df.drop(["duration","event"],axis=1)
-        df_feat_standardize = df_feat[cols_standardize]        
+        df_feat = df.drop(["duration", "event"], axis=1)
+        df_feat_standardize = df_feat[cols_standardize]
         df_feat_standardize_disc = StandardScaler().fit_transform(df_feat_standardize)
         df_feat_standardize_disc = pd.DataFrame(df_feat_standardize_disc, columns=cols_standardize)
 
         df_feat = pd.concat([df_feat[cols_categorical], df_feat_standardize_disc], axis=1)
-        
+
         vocab_size = 0
-        for i,feat in enumerate(cols_categorical):
+        for i, feat in enumerate(cols_categorical):
             df_feat[feat] = LabelEncoder().fit_transform(df_feat[feat]).astype(float) + vocab_size
             vocab_size = df_feat[feat].max() + 1
 
         # get the largest duraiton time
         max_duration_idx = df["duration"].argmax()
-        df_feat = df_feat.drop(max_duration_idx)
-        df_label = df[["duration","event"]].drop(max_duration_idx)
-        df_full = pd.concat([df_feat, df_label],axis=1)
-        df_train, df_test = train_test_split(df_full, test_size=0.3, random_state=random_state, stratify=df_full['event'])
-        df_train, df_val  = train_test_split(df_train, test_size=0.1, random_state=random_state, stratify=df_train['event'])
-
-        df_train = df_train.drop(["duration", "event"],axis=1)
-        df_val = df_val.drop(["duration", "event"],axis=1)
-        df_test = df_test.drop(["duration", "event"],axis=1)
+        df_test = df_feat.drop(max_duration_idx).sample(frac=0.3)
+        df_train = df_feat.drop(df_test.index)
+        df_val = df_train.drop(max_duration_idx).sample(frac=0.1)
+        df_train = df_train.drop(df_val.index)
 
         # assign cuts
         # labtrans = LabTransDiscreteTime(cuts=np.array([0]+times+[df["duration"].max()]))
-        labtrans = LabelTransform(cuts=np.array([0]+times+[df["duration"].max()]))
+        labtrans = LabelTransform(cuts=np.array([df["duration"].min()] + times + [df["duration"].max()]))
 
         labtrans.fit(*get_target(df.loc[df_train.index]))
         # y = labtrans.fit_transform(*get_target(df)) # y = (discrete duration, event indicator)
-        y = labtrans.transform(*get_target(df)) # y = (discrete duration, event indicator)
-        df_y_train = pd.DataFrame({"duration": y[0][df_train.index], "event": y[1][df_train.index], "proportion":y[2][df_train.index]}, index=df_train.index)
-        df_y_val = pd.DataFrame({"duration": y[0][df_val.index], "event": y[1][df_val.index], "proportion":y[2][df_val.index]}, index=df_val.index)
+        y = labtrans.transform(*get_target(df))  # y = (discrete duration, event indicator)
+        df_y_train = pd.DataFrame(
+            {"duration": y[0][df_train.index], "event": y[1][df_train.index], "proportion": y[2][df_train.index]},
+            index=df_train.index)
+        df_y_val = pd.DataFrame(
+            {"duration": y[0][df_val.index], "event": y[1][df_val.index], "proportion": y[2][df_val.index]},
+            index=df_val.index)
         # df_y_test = pd.DataFrame({"duration": y[0][df_test.index], "event": y[1][df_test.index], "proportion":y[2][df_test.index]}, index=df_test.index)
-        df_y_test = pd.DataFrame({"duration": df['duration'].loc[df_test.index], "event": df['event'].loc[df_test.index]})
+        df_y_test = pd.DataFrame(
+            {"duration": df['duration'].loc[df_test.index], "event": df['event'].loc[df_test.index]})
+
+    elif data == "flchain":
+        df = flchain.read_df()
+        df.rename({'futime': 'duration', 'death': 'event'}, axis=1, inplace=True)
+        times = np.quantile(df["duration"][df["event"] == 1.0], horizons).tolist()
+        cols_categorical = ['sex', 'sample.yr', 'mgus', 'flc.grp']
+        cols_standardize = ['age', 'creatinine', 'kappa', 'lambda']
+
+        df_feat = df.drop(["duration", "event"], axis=1)
+        df_feat_standardize = df_feat[cols_standardize]
+        df_feat_standardize_disc = StandardScaler().fit_transform(df_feat_standardize)
+        df_feat_standardize_disc = pd.DataFrame(df_feat_standardize_disc, columns=cols_standardize)
+
+        df_feat = pd.concat([df_feat[cols_categorical], df_feat_standardize_disc], axis=1)
+
+        vocab_size = 0
+        for i, feat in enumerate(cols_categorical):
+            df_feat[feat] = LabelEncoder().fit_transform(df_feat[feat]).astype(float) + vocab_size
+            vocab_size = df_feat[feat].max() + 1
+
+        # get the largest duraiton time
+        max_duration_idx = df["duration"].argmax()
+        df_test = df_feat.drop(max_duration_idx).sample(frac=0.3)
+        df_train = df_feat.drop(df_test.index)
+        df_val = df_train.drop(max_duration_idx).sample(frac=0.1)
+        df_train = df_train.drop(df_val.index)
+
+        # assign cuts
+        # labtrans = LabTransDiscreteTime(cuts=np.array([0]+times+[df["duration"].max()]))
+        labtrans = LabelTransform(cuts=np.array([df["duration"].min()] + times + [df["duration"].max()]))
+
+        labtrans.fit(*get_target(df.loc[df_train.index]))
+        # y = labtrans.fit_transform(*get_target(df)) # y = (discrete duration, event indicator)
+        y = labtrans.transform(*get_target(df))  # y = (discrete duration, event indicator)
+        df_y_train = pd.DataFrame(
+            {"duration": y[0][df_train.index], "event": y[1][df_train.index], "proportion": y[2][df_train.index]},
+            index=df_train.index)
+        df_y_val = pd.DataFrame(
+            {"duration": y[0][df_val.index], "event": y[1][df_val.index], "proportion": y[2][df_val.index]},
+            index=df_val.index)
+        # df_y_test = pd.DataFrame({"duration": y[0][df_test.index], "event": y[1][df_test.index], "proportion":y[2][df_test.index]}, index=df_test.index)
+        df_y_test = pd.DataFrame(
+            {"duration": df['duration'].loc[df_test.index], "event": df['event'].loc[df_test.index]})
 
 
     elif data == "seer":
         PATH_DATA = "./data/seer_processed.csv"
         df = pd.read_csv(PATH_DATA)
-        times = np.quantile(df["duration"][df["event_breast"]==1.0], horizons).tolist()
+        times = np.quantile(df["duration"][df["event_breast"] == 1.0], horizons).tolist()
 
         event_list = ["event_breast", "event_heart"]
 
         cols_categorical = ["Sex", "Year of diagnosis", "Race recode (W, B, AI, API)", "Histologic Type ICD-O-3",
-                    "Laterality", "Sequence number", "ER Status Recode Breast Cancer (1990+)",
-                    "PR Status Recode Breast Cancer (1990+)", "Summary stage 2000 (1998-2017)",
-                    "RX Summ--Surg Prim Site (1998+)", "Reason no cancer-directed surgery", "First malignant primary indicator",
-                    "Diagnostic Confirmation", "Median household income inflation adj to 2019"]
-        cols_standardize = ["Regional nodes examined (1988+)", "CS tumor size (2004-2015)", "Total number of benign/borderline tumors for patient",
-                    "Total number of in situ/malignant tumors for patient",]
+                            "Laterality", "Sequence number", "ER Status Recode Breast Cancer (1990+)",
+                            "PR Status Recode Breast Cancer (1990+)", "Summary stage 2000 (1998-2017)",
+                            "RX Summ--Surg Prim Site (1998+)", "Reason no cancer-directed surgery",
+                            "First malignant primary indicator",
+                            "Diagnostic Confirmation", "Median household income inflation adj to 2019"]
+        cols_standardize = ["Regional nodes examined (1988+)", "CS tumor size (2004-2015)",
+                            "Total number of benign/borderline tumors for patient",
+                            "Total number of in situ/malignant tumors for patient", ]
 
-        df_feat = df.drop(["duration","event_breast", "event_heart"],axis=1)
+        df_feat = df.drop(["duration", "event_breast", "event_heart"], axis=1)
 
-        df_feat_standardize = df_feat[cols_standardize]        
+        df_feat_standardize = df_feat[cols_standardize]
         df_feat_standardize_disc = StandardScaler().fit_transform(df_feat_standardize)
         df_feat_standardize_disc = pd.DataFrame(df_feat_standardize_disc, columns=cols_standardize)
         df_feat = pd.concat([df_feat[cols_categorical], df_feat_standardize_disc], axis=1)
 
         vocab_size = 0
-        for i,feat in enumerate(cols_categorical):
+        for i, feat in enumerate(cols_categorical):
             df_feat[feat] = LabelEncoder().fit_transform(df_feat[feat]).astype(float) + vocab_size
             vocab_size = df_feat[feat].max() + 1
-        
+
         # get the largest duraiton time
         max_duration_idx = df["duration"].argmax()
-        df_feat = df_feat.drop(max_duration_idx)
-        df_label = df[["duration","event"]].drop(max_duration_idx)
-        df_full = pd.concat([df_feat, df_label],axis=1)
-        df_train, df_test = train_test_split(df_full, test_size=0.3, random_state=random_state, stratify=df_full['event'])
-        df_train, df_val  = train_test_split(df_train, test_size=0.1, random_state=random_state, stratify=df_train['event'])
-
-        df_train = df_train.drop(["duration", "event"],axis=1)
-        df_val = df_val.drop(["duration", "event"],axis=1)
-        df_test = df_test.drop(["duration", "event"],axis=1)
+        df_test = df_feat.drop(max_duration_idx).sample(frac=0.3)
+        df_train = df_feat.drop(df_test.index)
+        df_val = df_train.drop(max_duration_idx).sample(frac=0.1)
+        df_train = df_train.drop(df_val.index)
 
         # assign cuts
-        labtrans = LabelTransform(cuts=np.array([0]+times+[df["duration"].max()]))
-        get_target = lambda df,event: (df['duration'].values, df[event].values)
+        labtrans = LabelTransform(cuts=np.array([df["duration"].min()] + times + [df["duration"].max()]))
+        get_target = lambda df, event: (df['duration'].values, df[event].values)
 
         # this datasets have two competing events!
-        df_y_train = pd.DataFrame({"duration":df["duration"][df_train.index]})
-        df_y_test = pd.DataFrame({"duration":df["duration"][df_test.index]})
-        df_y_val = pd.DataFrame({"duration":df["duration"][df_val.index]})
+        df_y_train = pd.DataFrame({"duration": df["duration"][df_train.index]})
+        df_y_test = pd.DataFrame({"duration": df["duration"][df_test.index]})
+        df_y_val = pd.DataFrame({"duration": df["duration"][df_val.index]})
 
-        for i,event in enumerate(event_list):
+        for i, event in enumerate(event_list):
             labtrans.fit(*get_target(df.loc[df_train.index], event))
-            y = labtrans.transform(*get_target(df, event)) # y = (discrete duration, event indicator)
+            y = labtrans.transform(*get_target(df, event))  # y = (discrete duration, event indicator)
 
             event_name = "event_{}".format(i)
             df[event_name] = y[1]

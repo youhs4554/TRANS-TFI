@@ -505,9 +505,13 @@ class BertCLS(nn.Module):
         # concatenate embeddings of all features
         net = []
         w_init = lambda w: nn.init.kaiming_normal_(w, nonlinearity="relu")
+        if config.custom_training:
+            seq_length = config.out_feature # equals to the length of sequence, indicating the output dim of the logit layer
+        else:
+            seq_length = config.num_feature # equals to the length of feature vector
         # the hidden states are pooled before going to cls layer
         net.append(
-            DenseVanillaBlock(config.hidden_size*config.num_feature, config.intermediate_size,
+            DenseVanillaBlock(config.hidden_size*seq_length, config.intermediate_size,
                 batch_norm=True, dropout=config.hidden_dropout_prob, activation=nn.ReLU,
                 w_init_=w_init)
         )
@@ -548,9 +552,9 @@ class BertEncoder(nn.Module):
     def __init__(self, config):
         super().__init__()
         self.config = config
-        self.layer = nn.ModuleList([BertLayer(config) 
+        self.layer = nn.ModuleList([BertLayer(config)
                 for _ in range(config.num_hidden_layers)])
-    
+
     def forward(
         self,
         hidden_states,
@@ -567,7 +571,7 @@ class BertEncoder(nn.Module):
         for i, layer_module in enumerate(self.layer):
             if output_hidden_states:
                 all_hidden_states = all_hidden_states + (hidden_states,)
-            
+
             layer_head_mask = head_mask[i] if head_mask is not None else None
 
             layer_outputs = layer_module(
@@ -581,7 +585,7 @@ class BertEncoder(nn.Module):
 
             if output_attentions:
                 all_self_attentions = all_self_attentions + (layer_outputs[1],)
-        
+
         if output_hidden_states:
             all_hidden_states = all_hidden_states + (hidden_states,)
 
