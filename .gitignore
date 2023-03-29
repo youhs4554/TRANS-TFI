@@ -135,6 +135,8 @@ logs/
 *checkpoints/
 *_checkpoint_*
 
+# IDE things (such as PyCharm, VSCode)
 *.idea/
+*.vscode/
 
 *model_dir/

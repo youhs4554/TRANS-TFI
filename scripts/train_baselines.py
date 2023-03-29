@@ -5,7 +5,7 @@ warnings.filterwarnings('ignore')
 
 import os, sys
 sys.path.append(os.path.abspath('../baselines'))
-from baselines.config import Config, BASELINE_MODEL_FAMILY
+from baselines.config import Config, BASELINE_MODEL_FAMILY, TIME_INJECTION_MODEL_FAMILY
 from baselines.eval_utils import Evaluator
 from baselines.train_utils import init_trainer
 from baselines.utils import create_logger
@@ -33,7 +33,7 @@ def run_experiment(model_name, time_range='full'):
     ev.report()  # log and report results in beautiful tables
 
 # Comparison with Baselines; CoxPH(=DeepSurv), DeepHitSingle
-for model_name, time_range in product(BASELINE_MODEL_FAMILY, ["full", "truncated"]):
+for model_name, time_range in product(BASELINE_MODEL_FAMILY + TIME_INJECTION_MODEL_FAMILY, ["full", "truncated"]):
     if model_name == 'PCHazard' and time_range == 'truncated':
         continue
     run_experiment(model_name, time_range)

@@ -3,12 +3,15 @@ import os.path
 import numpy as np
 import pycox.models
 import torch
+from torch.utils.data import DataLoader
 import torchtuples as tt
 from matplotlib import pyplot as plt
 from pycox.models.cox_time import MLPVanillaCoxTime
+from baselines import models
 
 from baselines.config import Config, BASELINE_MODEL_FAMILY
-from baselines.datasets import load_data
+from baselines.datasets import get_TDSA_dataloader, get_test_TDSA_data, load_data
+from baselines.loss import LossTDSurv
 from baselines.utils import seed_everything
 
 get_target = lambda df: (df['duration'].values, df['event'].values)
@@ -38,8 +41,7 @@ class PyCoxTrainer:
         self.model_class = getattr(pycox.models, cfg.model_name, None)
         self.time_range = cfg.time_range
         self.seq_len = cfg.seq_len
-        self.interpolate_discrete_times = (
-                self.model_name in ['DeepHitSingle', 'LogisticHazard', 'PMF', 'MTLR', 'BCESurv'])
+        self.interpolate_discrete_times = cfg.interpolate_discrete_times
         self.model_save_dir = cfg.model_save_dir
         os.makedirs(self.model_save_dir, exist_ok=True)
         self.cfg = cfg
@@ -125,9 +127,12 @@ class PyCoxTrainer:
             verbose = False if self.cfg.silent_fit else True
             es_patience = self.cfg.es_patience
 
-            log = model.fit(*self.train, epochs=self.cfg.n_ep,
-                            callbacks=[tt.callbacks.EarlyStopping(patience=es_patience)],
-                            val_data=self.val, verbose=verbose)
+            if isinstance(self.train, DataLoader) and isinstance(self.val, DataLoader):
+                log = model.fit_dataloader(self.train, epochs=self.cfg.n_ep, callbacks=[tt.callbacks.EarlyStopping(patience=es_patience)],
+                                           val_dataloader=self.val, verbose=verbose)
+            else:
+                log = model.fit(*self.train, epochs=self.cfg.n_ep, callbacks=[tt.callbacks.EarlyStopping(patience=es_patience)],
+                                val_data=self.val, verbose=verbose)
             if self.cfg.show_plot:
                 log.plot();
                 plt.show()
@@ -148,10 +153,58 @@ class PyCoxTrainer:
 
         return surv, model, history
 
+class PyTorchTrainer(PyCoxTrainer):
+    def __init__(self, cfg: Config):
+        super(PyTorchTrainer, self).__init__(cfg)
+        self.net_class = models.TDSA
+        beta = 1.0
+        if not cfg.model_name == 'BTDSA':
+            beta = 0.0
+
+        self.model_class = lambda net, optimizer, duration_index: models.PyCoxWrapper(net, LossTDSurv(beta=beta),
+                                                                                      optimizer,
+                                                                                      duration_index=duration_index)
+
+    def preprocess(self, dataset: str):
+        # Data loading (train/valid)
+        train_loader, val_loader = get_TDSA_dataloader(dataset=dataset, seq_len=self.cfg.seq_len, random_state=self.cfg.random_state)
+
+        x_test, durations_test, events_test, test_ds = get_test_TDSA_data(dataset=dataset,
+                                                                          seq_len=self.cfg.seq_len, random_state=self.cfg.random_state)  # get test data
+
+        labtrans = getattr(train_loader.dataset, 'labtrans', None)
+        taus = train_loader.dataset.taus
+
+        self.dataset = dataset
+        self.labtrans = labtrans
+        self.taus = taus
+
+        self.train = train_loader
+        self.val = val_loader
+        self.test = (x_test, np.c_[durations_test, events_test])
+
+        self.df_train_raw = train_loader.dataset.df_raw
+        self.df_val_raw = val_loader.dataset.df_raw
+        self.df_test_raw = test_ds.df_raw
+
+    def make_net(self):
+        train_ds = self.train.dataset
+        embeddings = models.get_embeddings(train_ds.n_embeddings)
+
+        self.cfg.net_kwargs['n_features'] = train_ds.n_features + 1  # +1 for time features
+        self.cfg.net_kwargs['output_size'] = 1  # each time step has single node (=sigmoid)
+        self.cfg.net_kwargs['n_durations'] = self.cfg.seq_len if self.cfg.time_range == 'full' else self.cfg.seq_len + 2
+        self.cfg.net_kwargs['embeddings'] = embeddings
+        net = self.net_class(**self.cfg.net_kwargs)
+        net.to(self.cfg.device)
+        return net
+
 
 def init_trainer(cfg):
     if cfg.model_name in BASELINE_MODEL_FAMILY:
         trainer_class = PyCoxTrainer
+    elif cfg.model_name == 'DRSA':
+        trainer_class = PyTorchTrainer
     else:
         raise NotImplementedError
     return trainer_class(cfg)
