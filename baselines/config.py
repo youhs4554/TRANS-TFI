@@ -5,7 +5,7 @@ from easydict import EasyDict
 
 BASELINE_MODEL_FAMILY = [
     # Discrete-Time Models,
-    "DeepHitSingle", "LogisticHazard", "LogisticHazard", "PMF", "MTLR", "BCESurv",
+    "DeepHitSingle", "LogisticHazard", "PMF", "MTLR", "BCESurv",
     # Continuous-Time Models
     "CoxPH", "PCHazard",
 ]
