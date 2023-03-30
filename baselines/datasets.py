@@ -45,9 +45,9 @@ def load_data(dataset, random_state=1234):
     df_train = df_train.drop(df_val.index)
 
     # Target info
-    y_train = df_train[cols_tgt].values
-    y_val = df_val[cols_tgt].values
-    y_test = df_test[cols_tgt].values
+    y_train = df_train[cols_tgt].values.astype('float32')
+    y_val = df_val[cols_tgt].values.astype('float32')
+    y_test = df_test[cols_tgt].values.astype('float32')
 
     df_train_raw = df_train
     df_val_raw = df_val
@@ -83,7 +83,7 @@ class TDSADataset(Dataset):
         setattr(self, 'taus', taus)
 
         if seq_len == 3:
-            labtrans = label_transforms.LabTransDiscreteTime(cuts=np.array([0] + taus + [df_full["duration"].max()]))
+            labtrans = label_transforms.LabTransDiscreteTime(cuts=np.array([df_full["duration"].min()] + taus + [df_full["duration"].max()]))
             setattr(self, 'seq_len', len(labtrans.cuts))
         else:
             labtrans = label_transforms.LabTransDiscreteTime(seq_len)

@@ -64,7 +64,7 @@ class PyCoxTrainer:
             init_labtrans = self.model_class.label_transform
             if self.time_range == 'truncated':
                 # For truncated time ranges
-                labtrans = init_labtrans(cuts=np.array([0] + taus + [df_full["duration"].max()]))
+                labtrans = init_labtrans(cuts=np.array([df_full["duration"].min()] + taus + [df_full["duration"].max()]))
             else:
                 labtrans = init_labtrans(self.seq_len)
 

@@ -293,7 +293,7 @@ class SurvTraceSingle(BaseModel):
             hazard = F.sigmoid(preds)
         else:
             hazard = F.softplus(preds)
-        hazard = pad_col(hazard, where="start")
+        hazard = pad_col(hazard, where="start")[:, 1:]
         return hazard
 
     def predict_risk(self, input_ids, batch_size=None):

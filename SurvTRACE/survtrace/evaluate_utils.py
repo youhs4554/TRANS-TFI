@@ -34,7 +34,7 @@ class Evaluator:
 
         surv_df = model.predict_surv_df(df_test)
         ev = EvalSurv(surv_df, durations_test, events_test, censor_surv='km')
-        ctd = ev.concordance_td('antolini')
+        ctd = ev.concordance_td('adj_antolini')
         metric_dict['C-td-full'] = ctd
         brs = brier_score(et_train, et_test, surv.to("cpu").numpy()[:,1:-1], times)[1]
 
@@ -109,7 +109,7 @@ class Evaluator:
             # do bootstrapping
             stats_dict = defaultdict(list)
             for i in range(nb_bootstrap):
-                df_test = test_set[0].sample(test_set[0].shape[0], replace=True)
+                df_test = test_set[0].sample(test_set[0].shape[0], replace=True, random_state=i)
                 df_y_test = test_set[1].loc[df_test.index]
 
                 if model.config['num_event'] > 1:

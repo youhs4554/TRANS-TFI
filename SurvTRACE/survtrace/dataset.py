@@ -36,7 +36,7 @@ def load_data(config):
 
         vocab_size = 0
         for _, feat in enumerate(cols_categorical):
-            df_feat[feat] = LabelEncoder().fit_transform(df_feat[feat]).astype(float) + vocab_size
+            df_feat[feat] = LabelEncoder().fit_transform(df_feat[feat]).astype('float32') + vocab_size
             vocab_size = df_feat[feat].max() + 1
 
         # get the largest duraiton time
@@ -75,7 +75,7 @@ def load_data(config):
 
         vocab_size = 0
         for i, feat in enumerate(cols_categorical):
-            df_feat[feat] = LabelEncoder().fit_transform(df_feat[feat]).astype(float) + vocab_size
+            df_feat[feat] = LabelEncoder().fit_transform(df_feat[feat]).astype('float32') + vocab_size
             vocab_size = df_feat[feat].max() + 1
 
         # get the largest duraiton time
@@ -118,7 +118,7 @@ def load_data(config):
 
         vocab_size = 0
         for i, feat in enumerate(cols_categorical):
-            df_feat[feat] = LabelEncoder().fit_transform(df_feat[feat]).astype(float) + vocab_size
+            df_feat[feat] = LabelEncoder().fit_transform(df_feat[feat]).astype('float32') + vocab_size
             vocab_size = df_feat[feat].max() + 1
 
         # get the largest duraiton time
@@ -172,7 +172,7 @@ def load_data(config):
 
         vocab_size = 0
         for i, feat in enumerate(cols_categorical):
-            df_feat[feat] = LabelEncoder().fit_transform(df_feat[feat]).astype(float) + vocab_size
+            df_feat[feat] = LabelEncoder().fit_transform(df_feat[feat]).astype('float32') + vocab_size
             vocab_size = df_feat[feat].max() + 1
 
         # get the largest duraiton time
