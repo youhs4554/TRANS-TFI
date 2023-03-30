@@ -109,7 +109,7 @@ class Evaluator:
             # do bootstrapping
             stats_dict = defaultdict(list)
             for i in range(nb_bootstrap):
-                df_test = test_set[0].sample(test_set[0].shape[0], replace=True, random_state=i)
+                df_test = test_set[0].sample(test_set[0].shape[0], replace=True)
                 df_y_test = test_set[1].loc[df_test.index]
 
                 if model.config['num_event'] > 1:
