@@ -140,3 +140,4 @@ logs/
 *.vscode/
 
 *model_dir/
+*mlruns

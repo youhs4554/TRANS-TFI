@@ -1,5 +1,7 @@
 import warnings
 
+import mlflow
+
 warnings.filterwarnings('ignore')
 
 from collections import defaultdict
@@ -75,50 +77,62 @@ def evaluate(model, x_test, y_test, y_train, df_full):
 def run_experiments(model_name):
     results = []
     for dataset in DATASETS:
-        seed_everything(random_state)
+        experiment = mlflow.get_experiment_by_name(dataset)
+        if experiment is None:
+            experiment_id = mlflow.create_experiment(dataset)
+            experiment = mlflow.get_experiment(experiment_id)
 
-        x_train, x_val, x_test, y_train, y_val, y_test, df_train_raw, df_val_raw, df_test_raw, df_full, cols_standardize, cols_categorical = load_data(
-            dataset, random_state=random_state)
+        with mlflow.start_run(experiment_id=experiment.experiment_id,
+                              run_name=model_name):
+            seed_everything(random_state)
 
-        y_train = format_labels(y_train)
-        y_test = format_labels(y_test)
+            x_train, x_val, x_test, y_train, y_val, y_test, df_train_raw, df_val_raw, df_test_raw, df_full, cols_standardize, cols_categorical = load_data(
+                dataset, random_state=random_state)
 
-        model = MODEL_DICT[model_name]()
-        model.fit(x_train, y_train)
+            y_train = format_labels(y_train)
+            y_test = format_labels(y_test)
 
-        result_dict = defaultdict(list)
-        for i in range(nb_bootstrap):
-            x_test_res = pd.DataFrame(x_test).sample(len(x_test), replace=True)
-            y_test_res = pd.DataFrame(y_test).iloc[x_test_res.index]
-            metric_dict = evaluate(model, x_test_res.values, y_test_res.to_records(index=False), y_train, df_full)
+            model = MODEL_DICT[model_name]()
+            model.fit(x_train, y_train)
 
-            for k in metric_dict.keys():
-                result_dict[k].append(metric_dict[k])
+            result_dict = defaultdict(list)
+            for i in range(nb_bootstrap):
+                x_test_res = pd.DataFrame(x_test).sample(len(x_test), replace=True)
+                y_test_res = pd.DataFrame(y_test).iloc[x_test_res.index]
+                metric_dict = evaluate(model, x_test_res.values, y_test_res.to_records(index=False), y_train, df_full)
 
-        confi_dict = {}
-        # compute confidence interveal 95%
-        alpha = 0.95
-        p1 = ((1 - alpha) / 2) * 100
-        p2 = (alpha + ((1.0 - alpha) / 2.0)) * 100
-        for k in result_dict.keys():
-            stats = result_dict[k]
-            lower = max(0, np.percentile(stats, p1))
-            upper = min(1.0, np.percentile(stats, p2))
-            confi_dict[k] = [(upper + lower) / 2, (upper - lower) / 2]
+                for k in metric_dict.keys():
+                    result_dict[k].append(metric_dict[k])
 
-        cindex_avg, cindex_interval = confi_dict.pop('C-td-full')
-        row_str = f"C-td (full): {cindex_avg:.4f} ({cindex_interval:.4f})\n"
-        for horizon in horizons:
-            keys = [k for k in confi_dict.keys() if k.startswith(str(horizon))]
-            results_at_horizon = [confi_dict[k] for k in keys]
-            msg = [f"[{horizon * 100}%]"]
-            for k, res in zip(keys, results_at_horizon):
-                metric = k.split('_')[1]
-                avg, interval = res
-                msg.append(f"{metric}: {avg:.4f} ({interval:.4f})")
-            row_str += (" ".join(msg) + "\n")
+            confi_dict = {}
+            # compute confidence interveal 95%
+            alpha = 0.95
+            p1 = ((1 - alpha) / 2) * 100
+            p2 = (alpha + ((1.0 - alpha) / 2.0)) * 100
+            for k in result_dict.keys():
+                stats = result_dict[k]
+                lower = max(0, np.percentile(stats, p1))
+                upper = min(1.0, np.percentile(stats, p2))
+                confi_dict[k] = [(upper + lower) / 2, (upper - lower) / 2]
 
-        results.append(row_str)
+            cindex_avg, cindex_interval = confi_dict.pop('C-td-full')
+            row_str = f"C-td (full): {cindex_avg:.4f} ({cindex_interval:.4f})\n"
+            mlflow.log_metric('Ctd__avg', cindex_avg)
+            mlflow.log_metric('Ctd__interval', cindex_interval)
+
+            for horizon in horizons:
+                keys = [k for k in confi_dict.keys() if k.startswith(str(horizon))]
+                results_at_horizon = [confi_dict[k] for k in keys]
+                msg = [f"[{horizon * 100}%]"]
+                for k, res in zip(keys, results_at_horizon):
+                    metric = k[k.find('_')+1:]
+                    avg, interval = res
+                    msg.append(f"{metric}: {avg:.4f} ({interval:.4f})")
+                    mlflow.log_metric(str(horizon) + '_' + metric + '__avg', avg)
+                    mlflow.log_metric(str(horizon) + '_' + metric + '__interval', interval)
+                row_str += (" ".join(msg) + "\n")
+
+            results.append(row_str)
 
     tb = pt.PrettyTable(title=model_name)
     tb.field_names = DATASETS

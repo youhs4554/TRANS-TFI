@@ -5,6 +5,8 @@
 
 import warnings
 
+import mlflow
+
 from SurvTRACE.survtrace.custom_loss import LossTDSurv
 from SurvTRACE.survtrace.losses import NLLPCHazardLoss
 
@@ -62,55 +64,58 @@ def run_experiment(dataset, custom_training=True, show_plot=False):
         'learning_rate': 1e-3,
         'epochs': 200,
     }
-    if STConfig['data'] == 'support':
-        hparams = {
-            'batch_size': 1024,
-            'weight_decay': 0,
-            'learning_rate': 1e-4,
-            'epochs': 200,
-        }
+    experiment = mlflow.get_experiment_by_name(dataset)
+    if experiment is None:
+        experiment_id = mlflow.create_experiment(dataset)
+        experiment = mlflow.get_experiment(experiment_id)
 
-    # load data
-    df, df_train, df_y_train, df_test, df_y_test, df_val, df_y_val = load_data(STConfig)
+    with mlflow.start_run(experiment_id=experiment.experiment_id,
+                          run_name=model_name):
+        # load data
+        df, df_train, df_y_train, df_test, df_y_test, df_val, df_y_val = load_data(STConfig)
 
-    # get model
-    model = SurvTraceSingle(STConfig)
+        # get model
+        model = SurvTraceSingle(STConfig)
 
-    # initialize a trainer
-    trainer = Trainer(model, metrics=metrics)
-    train_loss, val_loss = trainer.fit((df_train, df_y_train), (df_val, df_y_val),
-                                       batch_size=hparams['batch_size'],
-                                       epochs=hparams['epochs'],
-                                       learning_rate=hparams['learning_rate'],
-                                       weight_decay=hparams['weight_decay'])
+        # initialize a trainer
+        trainer = Trainer(model, metrics=metrics)
+        train_loss, val_loss = trainer.fit((df_train, df_y_train), (df_val, df_y_val),
+                                           batch_size=hparams['batch_size'],
+                                           epochs=hparams['epochs'],
+                                           learning_rate=hparams['learning_rate'],
+                                           weight_decay=hparams['weight_decay'])
 
-    # evaluate model
-    evaluator = Evaluator(df, df_train.index)
-    result_dict = evaluator.eval(model, (df_test, df_y_test), confidence=.95, nb_bootstrap=10)
+        # evaluate model
+        evaluator = Evaluator(df, df_train.index)
+        result_dict = evaluator.eval(model, (df_test, df_y_test), confidence=.95, nb_bootstrap=10)
 
-    # Messages for pretty table summary
-    cindex_avg, cindex_interval = result_dict.pop('C-td-full')
-    row_str = f"C-td (full): {cindex_avg:.4f} ({cindex_interval:.4f})\n"
+        # Messages for pretty table summary
+        cindex_avg, cindex_interval = result_dict.pop('C-td-full')
+        row_str = f"C-td (full): {cindex_avg:.4f} ({cindex_interval:.4f})\n"
+        mlflow.log_metric('Ctd__avg', cindex_avg)
+        mlflow.log_metric('Ctd__interval', cindex_interval)
 
-    for horizon in horizons:
-        keys = [k for k in result_dict.keys() if k.startswith(str(horizon))]
-        results_at_horizon = [result_dict[k] for k in keys]
-        msg = [f"[{horizon * 100}%]"]
-        for k, res in zip(keys, results_at_horizon):
-            metric = k.split('_')[1]
-            avg, interval = res
-            msg.append(f"{metric}: {avg:.4f} ({interval:.4f})")
-        row_str += (" ".join(msg) + "\n")
-    results.append(row_str)
+        for horizon in horizons:
+            keys = [k for k in result_dict.keys() if k.startswith(str(horizon))]
+            results_at_horizon = [result_dict[k] for k in keys]
+            msg = [f"[{horizon * 100}%]"]
+            for k, res in zip(keys, results_at_horizon):
+                metric = k[k.find('_')+1:]
+                avg, interval = res
+                msg.append(f"{metric}: {avg:.4f} ({interval:.4f})")
+                mlflow.log_metric(str(horizon) + '_' + metric + '__avg', avg)
+                mlflow.log_metric(str(horizon) + '_' + metric + '__interval', interval)
+            row_str += (" ".join(msg) + "\n")
+        results.append(row_str)
 
-    if show_plot:
-        # show training curves
-        plt.plot(train_loss, label='train')
-        plt.plot(val_loss, label='val')
-        plt.legend(fontsize=20)
-        plt.xlabel('epoch', fontsize=20)
-        plt.ylabel('loss', fontsize=20)
-        plt.show()
+        if show_plot:
+            # show training curves
+            plt.plot(train_loss, label='train')
+            plt.plot(val_loss, label='val')
+            plt.legend(fontsize=20)
+            plt.xlabel('epoch', fontsize=20)
+            plt.ylabel('loss', fontsize=20)
+            plt.show()
 
 
 def fit_report(custom_training):

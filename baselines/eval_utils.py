@@ -1,5 +1,6 @@
 from collections import defaultdict
 
+import mlflow
 import numpy as np
 import pandas as pd
 import prettytable as pt
@@ -101,15 +102,19 @@ class Evaluator:
 
         cindex_avg, cindex_interval = result_dict.pop('C-td-full')
         row_str = f"C-td (full): {cindex_avg:.4f} ({cindex_interval:.4f})\n"
+        mlflow.log_metric('Ctd__avg', cindex_avg)
+        mlflow.log_metric('Ctd__interval', cindex_interval)
 
         for horizon in horizons:
             keys = [k for k in result_dict.keys() if k.startswith(str(horizon))]
             results_at_horizon = [result_dict[k] for k in keys]
             msg = [f"[{horizon * 100}%]"]
             for k, res in zip(keys, results_at_horizon):
-                metric = k.split('_')[1]
+                metric = k[k.find('_')+1:]
                 avg, interval = res
                 msg.append(f"{metric}: {avg:.4f} ({interval:.4f})")
+                mlflow.log_metric(str(horizon) + '_' + metric + '__avg', avg)
+                mlflow.log_metric(str(horizon) + '_' + metric + '__interval', interval)
             row_str += (" ".join(msg) + "\n")
         self.results.append(row_str)
 
