@@ -32,7 +32,7 @@ class Evaluator:
         et_test = np.array([(events_test[i], durations_test[i]) for i in range(len(events_test))],
                     dtype = [('e', bool), ('t', float)])
 
-        surv_df = model.predict_surv_df(df_test)
+        surv_df = model.interpolate(100).predict_surv_df(df_test)
         ev = EvalSurv(surv_df, durations_test, events_test, censor_surv='km')
         ctd = ev.concordance_td('adj_antolini')
         metric_dict['C-td-full'] = ctd

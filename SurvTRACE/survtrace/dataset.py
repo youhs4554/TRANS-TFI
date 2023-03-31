@@ -102,12 +102,11 @@ def load_data(config):
         df_y_test = pd.DataFrame(
             {"duration": df['duration'].loc[df_test.index], "event": df['event'].loc[df_test.index]})
 
-    elif data == "flchain":
-        df = flchain.read_df()
-        df.rename({'futime': 'duration', 'death': 'event'}, axis=1, inplace=True)
+    elif data == "support":
+        df = support.read_df()
         times = np.quantile(df["duration"][df["event"] == 1.0], horizons).tolist()
-        cols_categorical = ['sex', 'sample.yr', 'mgus', 'flc.grp']
-        cols_standardize = ['age', 'creatinine', 'kappa', 'lambda']
+        cols_standardize = ['x0', 'x7', 'x8', 'x9', 'x10', 'x11', 'x12', 'x13']
+        cols_categorical = ['x1', 'x2', 'x3', 'x4', 'x5', 'x6']
 
         df_feat = df.drop(["duration", "event"], axis=1)
         df_feat_standardize = df_feat[cols_standardize]

@@ -24,7 +24,7 @@ from SurvTRACE.survtrace.train_utils import Trainer
 from SurvTRACE.survtrace.config import STConfig
 import prettytable as pt
 
-DATASETS = ['gbsg', 'metabric', 'flchain']
+DATASETS = ['gbsg', 'metabric', 'support']
 
 from baselines.utils import create_logger
 
@@ -62,7 +62,7 @@ def run_experiment(dataset, custom_training=True, show_plot=False):
         'learning_rate': 1e-3,
         'epochs': 200,
     }
-    if STConfig['data'] == 'flchain':
+    if STConfig['data'] == 'support':
         hparams = {
             'batch_size': 1024,
             'weight_decay': 0,

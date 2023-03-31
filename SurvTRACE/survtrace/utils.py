@@ -92,7 +92,7 @@ class LabelTransform:
         """
         if self.cuts is None:
             raise ValueError("Need to call `fit` before this is accessible.")
-        return len(self.cuts)
+        return len(self.cuts) - 1
 
 def pad_col(input, val=0, where='end'):
     """Addes a column of `val` at the start of end of `input`."""

@@ -6,6 +6,8 @@ import pandas as pd
 import torchtuples as tt
 import pdb
 import torch.nn.functional as F
+from pycox.models.interpolation import InterpolateLogisticHazard
+
 from .modeling_bert import BaseModel, BertEmbeddings, BertEncoder, BertCLS, BertCLSMulti
 from .utils import pad_col
 from .config import STConfig
@@ -293,17 +295,18 @@ class SurvTraceSingle(BaseModel):
             hazard = F.sigmoid(preds)
         else:
             hazard = F.softplus(preds)
-        hazard = pad_col(hazard, where="start")[:, 1:]
+        hazard = pad_col(hazard, where="start")
         return hazard
 
     def predict_risk(self, input_ids, batch_size=None):
         surv = self.predict_surv(input_ids, batch_size)
         return 1 - surv
 
-    def predict_surv(self, input_ids, batch_size=None, epsilon=1e-7):
+    def predict_surv(self, input_ids, batch_size=None, numpy=None, eval_=True, to_cpu=False,
+                     num_workers=0):
         hazard = self.predict_hazard(input_ids, batch_size)
         if self.config.custom_training:
-            surv = (1 - hazard).add(epsilon).log().cumsum(1).exp()
+            surv = (1 - hazard).add(1e-7).log().cumsum(1).exp()
         else:
             surv = hazard.cumsum(1).mul(-1).exp()
         return surv
@@ -311,3 +314,23 @@ class SurvTraceSingle(BaseModel):
     def predict_surv_df(self, input_ids, batch_size=None):
         surv = self.predict_surv(input_ids, batch_size)
         return pd.DataFrame(surv.to("cpu").numpy().T, self.duration_index)
+
+    def interpolate(self, sub=10, scheme='const_pdf', duration_index=None):
+        """Use interpolation for predictions.
+        There is only one scheme:
+            `const_pdf` and `lin_surv` which assumes pice-wise constant PMF in each interval (linear survival).
+
+        Keyword Arguments:
+            sub {int} -- Number of "sub" units in interpolation grid. If `sub` is 10 we have a grid with
+                10 times the number of grid points than the original `duration_index` (default: {10}).
+            scheme {str} -- Type of interpolation {'const_pdf'}.
+                See `InterpolateDiscrete` (default: {'const_pdf'})
+            duration_index {np.array} -- Cuts used for discretization. Does not affect interpolation,
+                only for setting index in `predict_surv_df` (default: {None})
+
+        Returns:
+            [InterpolateLogisticHazard] -- Object for prediction with interpolation.
+        """
+        if duration_index is None:
+            duration_index = self.duration_index
+        return InterpolateLogisticHazard(self, scheme, duration_index, sub)

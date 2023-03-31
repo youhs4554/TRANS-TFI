@@ -8,9 +8,9 @@ from torch.utils.data import Dataset, DataLoader
 
 
 def load_data(dataset, random_state=1234):
-    if dataset == 'flchain':
-        cols_standardize = ['age', 'creatinine', 'kappa', 'lambda']
-        cols_categorical = ['sex', 'sample.yr', 'mgus', 'flc.grp']
+    if dataset == 'support':
+        cols_standardize = ['x0', 'x7', 'x8', 'x9', 'x10', 'x11', 'x12', 'x13']
+        cols_categorical = ['x1', 'x2', 'x3', 'x4', 'x5', 'x6']
     elif dataset == 'metabric':
         cols_standardize = ['x0', 'x1', 'x2', 'x3', 'x8']
         cols_categorical = ['x4', 'x5', 'x6', 'x7']
@@ -24,9 +24,6 @@ def load_data(dataset, random_state=1234):
 
     # Split train/val/test
     df_full = getattr(dt, dataset).read_df()
-    if dataset == 'flchain':
-        df_full.rename({'futime': 'duration', 'death': 'event'}, axis=1, inplace=True)
-        df_full = df_full.astype('float32')
     df_feats = df_full.drop(cols_tgt, axis=1)
     df_labels = df_full[cols_tgt]
 

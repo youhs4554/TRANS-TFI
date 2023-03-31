@@ -26,7 +26,7 @@ class Config(EasyDict):
     @classmethod
     def setup(cls):
         cls.horizons = [.25, .5, .75]  # truncated time horizons 25%, 50%, 75%
-        cls.list_of_datasets = ['gbsg', 'metabric', 'flchain']  # name of dataset
+        cls.list_of_datasets = ['gbsg', 'metabric', 'support']  # name of dataset
 
         assert cls.model_name in BASELINE_MODEL_FAMILY + TIME_INJECTION_MODEL_FAMILY
 
@@ -47,7 +47,7 @@ class Config(EasyDict):
 
         # if true, interpolate discrete-time model outputs for evaluation
         cls.interpolate_discrete_times = (cls.model_name in ['DeepHitSingle', 'LogisticHazard', 'PMF', 'MTLR',
-                                                             'BCESurv', 'DRSA']) and (cls.time_range == 'full')
+                                                             'BCESurv', 'DRSA'])
 
         if not torch.backends.mps.is_available():
             cls.device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
