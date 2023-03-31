@@ -1,13 +1,19 @@
 import numpy as np
 import pandas as pd
 from sklearn.preprocessing import StandardScaler, LabelEncoder
-import pycox.datasets as dt
+import pycox.datasets
 from pycox.preprocessing import label_transforms
 import torch
 from torch.utils.data import Dataset, DataLoader
+import data.custom_dataset
 
 
 def load_data(dataset, random_state=1234):
+    dt = pycox.datasets
+    if dataset not in ['metabric', 'gbsg']:
+        dt = data.custom_dataset
+    reader = getattr(dt, dataset)
+
     if dataset == 'metabric':
         cols_standardize = ['x0', 'x1', 'x2', 'x3', 'x8']
         cols_categorical = ['x4', 'x5', 'x6', 'x7']
@@ -15,12 +21,11 @@ def load_data(dataset, random_state=1234):
         cols_standardize = ['x3', 'x4', 'x5', 'x6']
         cols_categorical = ['x0', 'x1', 'x2']
     else:
-        raise NotImplementedError
+        cols_standardize = reader.cols_numerical
+        cols_categorical = reader.cols_categorical
 
     cols_tgt = ['duration', 'event']
-
-    # Split train/val/test
-    df_full = getattr(dt, dataset).read_df()
+    df_full = reader.read_df()
     df_feats = df_full.drop(cols_tgt, axis=1)
     df_labels = df_full[cols_tgt]
 
@@ -33,6 +38,7 @@ def load_data(dataset, random_state=1234):
     df_feats = pd.concat([df_feats[cols_categorical], df_feats_standardize_disc], axis=1)
     df_full = pd.concat([df_feats, df_labels], axis=1)
     max_duration_idx = df_full["duration"].argmax()
+    # Split train/val/test
     df_test = df_full.drop(max_duration_idx).sample(frac=0.3, random_state=random_state)
     df_train = df_full.drop(df_test.index)
     df_val = df_train.drop(max_duration_idx).sample(frac=0.1, random_state=random_state)
@@ -52,9 +58,9 @@ def load_data(dataset, random_state=1234):
     df_val = df_val.drop(cols_tgt, axis=1)
     df_test = df_test.drop(cols_tgt, axis=1)
 
-    x_train = df_train.values
-    x_val = df_val.values
-    x_test = df_test.values
+    x_train = df_train.values.astype('float32')
+    x_val = df_val.values.astype('float32')
+    x_test = df_test.values.astype('float32')
 
     return x_train, x_val, x_test, y_train, y_val, y_test, df_train_raw, df_val_raw, df_test_raw, df_full, cols_standardize, cols_categorical
 

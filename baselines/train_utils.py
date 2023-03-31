@@ -131,6 +131,8 @@ class PyCoxTrainer:
                 log = model.fit_dataloader(self.train, epochs=self.cfg.n_ep, callbacks=[tt.callbacks.EarlyStopping(patience=es_patience)],
                                            val_dataloader=self.val, verbose=verbose)
             else:
+                if dataset == 'dialysis':
+                    print()
                 log = model.fit(*self.train, epochs=self.cfg.n_ep, callbacks=[tt.callbacks.EarlyStopping(patience=es_patience)],
                                 val_data=self.val, verbose=verbose)
             if self.cfg.show_plot:
