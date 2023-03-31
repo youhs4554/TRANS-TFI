@@ -1,10 +1,15 @@
+import warnings
+
+warnings.filterwarnings('ignore')
+
 from collections import defaultdict
 
 import numpy as np
 import pandas as pd
+from pycox.evaluation import EvalSurv
 from sksurv.ensemble import RandomSurvivalForest
 from sksurv.linear_model import CoxPHSurvivalAnalysis
-from sksurv.metrics import brier_score, concordance_index_ipcw, cumulative_dynamic_auc
+from sksurv.metrics import brier_score, concordance_index_ipcw, cumulative_dynamic_auc, concordance_index_censored
 import prettytable as pt
 
 from baselines.datasets import load_data
@@ -33,13 +38,26 @@ def evaluate(model, x_test, y_test, y_train, df_full):
     risk_scores = model.predict(x_test)
     times = np.quantile(df_full["duration"][df_full["event"] == 1.0], horizons).tolist()
 
-    surv_prob = np.row_stack([
+
+    surv_func = model.predict_survival_function(x_test)
+    surv = np.row_stack([
+        fn(fn.x)
+        for fn in surv_func
+    ])
+    surv_df = pd.DataFrame(surv.T, index=surv_func[0].x)
+
+    out_survival = np.row_stack([
         fn(times)
         for fn in model.predict_survival_function(x_test)
     ])
-    brs = brier_score(y_train, y_test, surv_prob, times)[1]
+
+    ev = EvalSurv(surv_df, y_test.t, y_test.e, censor_surv='km')
+    cindex = ev.concordance_td('adj_antolini')
 
     metric_dict = {}
+    metric_dict['C-td-full'] = cindex
+    brs = brier_score(y_train, y_test, out_survival, times)[1]
+
     cis = []
     aucs = []
     for i, _ in enumerate(times):
@@ -88,7 +106,8 @@ def run_experiments(model_name):
             upper = min(1.0, np.percentile(stats, p2))
             confi_dict[k] = [(upper + lower) / 2, (upper - lower) / 2]
 
-        row_str = ""
+        cindex_avg, cindex_interval = confi_dict.pop('C-td-full')
+        row_str = f"C-td (full): {cindex_avg:.4f} ({cindex_interval:.4f})\n"
         for horizon in horizons:
             keys = [k for k in confi_dict.keys() if k.startswith(str(horizon))]
             results_at_horizon = [confi_dict[k] for k in keys]
