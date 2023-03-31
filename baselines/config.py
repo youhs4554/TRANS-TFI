@@ -26,7 +26,7 @@ class Config(EasyDict):
     @classmethod
     def setup(cls):
         cls.horizons = [.25, .5, .75]  # truncated time horizons 25%, 50%, 75%
-        cls.list_of_datasets = ['gbsg', 'metabric', 'support']  # name of dataset
+        cls.list_of_datasets = ['gbsg', 'metabric']  # name of dataset
 
         assert cls.model_name in BASELINE_MODEL_FAMILY + TIME_INJECTION_MODEL_FAMILY
 

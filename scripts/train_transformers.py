@@ -24,7 +24,7 @@ from SurvTRACE.survtrace.train_utils import Trainer
 from SurvTRACE.survtrace.config import STConfig
 import prettytable as pt
 
-DATASETS = ['gbsg', 'metabric', 'support']
+DATASETS = ['gbsg', 'metabric']
 
 from baselines.utils import create_logger
 

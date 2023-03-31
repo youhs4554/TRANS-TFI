@@ -33,6 +33,7 @@ def bootstrap_eval(model, x_test, durations_test, events_test, et_train, taus, h
         cindex = ev.concordance_td('adj_antolini')
         result_dict['C-td-full'].append(cindex)
 
+        # select idx at times
         idx = idx_at_times(surv.index, taus, 'post')
         out_survival = surv.iloc[idx].T
         out_risk = 1.0 - out_survival

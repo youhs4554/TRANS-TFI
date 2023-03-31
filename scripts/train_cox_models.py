@@ -10,7 +10,7 @@ import prettytable as pt
 from baselines.datasets import load_data
 from baselines.utils import seed_everything
 
-DATASETS = ['gbsg', 'metabric', 'support']
+DATASETS = ['gbsg', 'metabric']
 
 MODEL_DICT = {
     "cph": CoxPHSurvivalAnalysis,

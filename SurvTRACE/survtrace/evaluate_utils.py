@@ -1,6 +1,7 @@
 from collections import defaultdict
 
 from pycox.evaluation import EvalSurv
+from pycox.utils import idx_at_times
 from sksurv.metrics import concordance_index_ipcw, brier_score, cumulative_dynamic_auc
 import numpy as np
 import pdb
@@ -25,26 +26,31 @@ class Evaluator:
         horizons = model.config['horizons']
 
         df_test, df_y_test = test_set
-        surv = model.predict_surv(df_test, batch_size=val_batch_size)
-        risk = 1 - surv
-
+        surv = model.interpolate(100).predict_surv_df(df_test)
         durations_test, events_test = get_target(df_y_test)
         et_test = np.array([(events_test[i], durations_test[i]) for i in range(len(events_test))],
                     dtype = [('e', bool), ('t', float)])
-
-        surv_df = model.interpolate(100).predict_surv_df(df_test)
-        ev = EvalSurv(surv_df, durations_test, events_test, censor_surv='km')
+        ev = EvalSurv(surv, durations_test, events_test, censor_surv='km')
         ctd = ev.concordance_td('adj_antolini')
         metric_dict['C-td-full'] = ctd
-        brs = brier_score(et_train, et_test, surv.to("cpu").numpy()[:,1:-1], times)[1]
+
+        # select idx at times
+        idx = idx_at_times(surv.index, times, 'post')
+        out_survival = surv.iloc[idx].T
+        out_risk = 1.0 - out_survival
+
+        # pd -> numpy
+        out_risk = np.array(out_risk)
+
+        brs = brier_score(et_train, et_test, out_survival.values, times)[1]
 
         cis = []
         aucs = []
         for i, _ in enumerate(times):
             cis.append(
-                concordance_index_ipcw(et_train, et_test, estimate=risk[:, i+1].to("cpu").numpy(), tau=times[i])[0]
+                concordance_index_ipcw(et_train, et_test, estimate=out_risk[:, i], tau=times[i])[0]
                 )
-            aucs.append(cumulative_dynamic_auc(et_train, et_test, risk[:, i+1].to("cpu").numpy(), times[i])[0].item())
+            aucs.append(cumulative_dynamic_auc(et_train, et_test, out_risk[:, i], times[i])[0].item())
             metric_dict[f'{horizons[i]}_Ctd_ipcw'] = cis[i]
             metric_dict[f'{horizons[i]}_brier'] = brs[i]
             metric_dict[f'{horizons[i]}_auroc'] = aucs[i]
