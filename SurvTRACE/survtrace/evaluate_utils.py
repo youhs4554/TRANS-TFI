@@ -14,7 +14,7 @@ class Evaluator:
         '''
         self.df_train_all = df.loc[train_index]
 
-    def eval_single(self, model, test_set, val_batch_size=None):
+    def eval_single(self, model, test_set, times=None, horizons=None, val_batch_size=None):
         metric_dict = defaultdict(list)
 
         df_train_all = self.df_train_all
@@ -22,8 +22,6 @@ class Evaluator:
         durations_train, events_train = get_target(df_train_all)
         et_train = np.array([(events_train[i], durations_train[i]) for i in range(len(events_train))],
                         dtype = [('e', bool), ('t', float)])
-        times = model.config['duration_index'][1:-1]
-        horizons = model.config['horizons']
 
         df_test, df_y_test = test_set
         surv = model.interpolate(100).predict_surv_df(df_test)
@@ -96,7 +94,7 @@ class Evaluator:
 
         return metric_dict
 
-    def eval(self, model, test_set, confidence=None, val_batch_size=None, nb_bootstrap=10):
+    def eval(self, model, test_set, times=None, horizons=None, confidence=None, val_batch_size=None, nb_bootstrap=10):
         '''do evaluation.
         if confidence is not None, it should be in (0, 1) and the confidence
         interval will be given by bootstrapping.
@@ -109,7 +107,7 @@ class Evaluator:
             if model.config['num_event'] > 1:
                 return self.eval_multi(model, test_set, val_batch_size)
             else:
-                return self.eval_single(model, test_set, val_batch_size)
+                return self.eval_single(model, test_set, times, horizons, val_batch_size)
 
         else:
             # do bootstrapping
@@ -121,7 +119,7 @@ class Evaluator:
                 if model.config['num_event'] > 1:
                     res_dict = self.eval_multi(model, (df_test, df_y_test), val_batch_size)
                 else:
-                    res_dict = self.eval_single(model, (df_test, df_y_test), val_batch_size)
+                    res_dict = self.eval_single(model, (df_test, df_y_test), times, horizons, val_batch_size)
 
                 for k in res_dict.keys():
                     stats_dict[k].append(res_dict[k])

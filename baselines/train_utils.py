@@ -76,8 +76,12 @@ class PyCoxTrainer:
 
         self.dataset = dataset
         self.labtrans = labtrans
+        if dataset == 'dialysis':
+            taus = [365 * 1, 365 * 3, 365 * 5] # evaluate at 1yr, 3yr, 5yr
+            durations = np.sort(df_full["duration"][df_full["event"] == 1.0].values)
+            horizons = [round(np.searchsorted(durations, t) / len(durations), 4) for t in taus]
+            self.cfg.horizons = horizons
         self.taus = taus
-
         self.train = (x_train, y_train)
         self.val = (x_val, y_val)
         self.test = (x_test, y_test)

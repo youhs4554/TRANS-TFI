@@ -6,6 +6,7 @@
 import warnings
 
 import mlflow
+import numpy as np
 
 from SurvTRACE.survtrace.custom_loss import LossTDSurv
 from SurvTRACE.survtrace.losses import NLLPCHazardLoss
@@ -32,7 +33,6 @@ from baselines.utils import create_logger
 
 logger = create_logger('./logs_survtrace')
 
-horizons = STConfig.horizons
 headers = DATASETS
 
 results = []
@@ -74,6 +74,14 @@ def run_experiment(dataset, custom_training=True, show_plot=False):
         # load data
         df, df_train, df_y_train, df_test, df_y_test, df_val, df_y_val = load_data(STConfig)
 
+        if dataset == 'dialysis':
+            durations = np.sort(df["duration"][df["event"] == 1.0].values)
+            times = [365 * 1, 365 * 3, 365 * 5] # evaluate at 1yr, 3yr, 5yr
+            horizons = [round(np.searchsorted(durations, t) / len(durations), 4) for t in times]
+        else:
+            times = STConfig['duration_index'][1:-1] # evaluate at 25%, 50%, 75% durations (default)
+            horizons = STConfig['horizons']
+
         # get model
         model = SurvTraceSingle(STConfig)
 
@@ -87,7 +95,7 @@ def run_experiment(dataset, custom_training=True, show_plot=False):
 
         # evaluate model
         evaluator = Evaluator(df, df_train.index)
-        result_dict = evaluator.eval(model, (df_test, df_y_test), confidence=.95, nb_bootstrap=10)
+        result_dict = evaluator.eval(model, (df_test, df_y_test), times=times, horizons=horizons, confidence=.95, nb_bootstrap=10)
 
         # Messages for pretty table summary
         cindex_avg, cindex_interval = result_dict.pop('C-td-full')
@@ -98,7 +106,7 @@ def run_experiment(dataset, custom_training=True, show_plot=False):
         for horizon in horizons:
             keys = [k for k in result_dict.keys() if k.startswith(str(horizon))]
             results_at_horizon = [result_dict[k] for k in keys]
-            msg = [f"[{horizon * 100}%]"]
+            msg = [f"[{round(horizon * 100, 4)}%]"]
             for k, res in zip(keys, results_at_horizon):
                 metric = k[k.find('_')+1:]
                 avg, interval = res

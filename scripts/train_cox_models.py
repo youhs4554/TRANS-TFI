@@ -24,10 +24,9 @@ MODEL_DICT = {
     "rsf": RandomSurvivalForest
 }
 
-horizons = [.25, .5, .75]
+DEFAULT_HORIZONS = [.25, .5, .75]
 random_state = 1234
 nb_bootstrap = 10
-
 
 def format_labels(y):
     durations, events = y.T
@@ -35,11 +34,9 @@ def format_labels(y):
                     dtype=[('e', bool), ('t', float)])
 
 
-def evaluate(model, x_test, y_test, y_train, df_full):
+def evaluate(model, x_test, y_test, y_train, times, horizons):
     # Evaluation
     risk_scores = model.predict(x_test)
-    times = np.quantile(df_full["duration"][df_full["event"] == 1.0], horizons).tolist()
-
 
     surv_func = model.predict_survival_function(x_test)
     surv = np.row_stack([
@@ -89,6 +86,13 @@ def run_experiments(model_name):
             x_train, x_val, x_test, y_train, y_val, y_test, df_train_raw, df_val_raw, df_test_raw, df_full, cols_standardize, cols_categorical = load_data(
                 dataset, random_state=random_state)
 
+            horizons = DEFAULT_HORIZONS
+            times = np.quantile(df_full["duration"][df_full["event"] == 1.0], horizons).tolist()
+            if dataset == 'dialysis':
+                times = [365 * 1, 365 * 3, 365 * 5] # evaluate at 1yr, 3yr, 5yr
+                durations = np.sort(df_full["duration"][df_full["event"] == 1.0].values)
+                horizons = [ round(np.searchsorted(durations, t) / len(durations), 4) for t in times ]
+
             y_train = format_labels(y_train)
             y_test = format_labels(y_test)
 
@@ -99,7 +103,7 @@ def run_experiments(model_name):
             for i in range(nb_bootstrap):
                 x_test_res = pd.DataFrame(x_test).sample(len(x_test), replace=True)
                 y_test_res = pd.DataFrame(y_test).iloc[x_test_res.index]
-                metric_dict = evaluate(model, x_test_res.values, y_test_res.to_records(index=False), y_train, df_full)
+                metric_dict = evaluate(model, x_test_res.values, y_test_res.to_records(index=False), y_train, times, horizons)
 
                 for k in metric_dict.keys():
                     result_dict[k].append(metric_dict[k])
@@ -123,7 +127,7 @@ def run_experiments(model_name):
             for horizon in horizons:
                 keys = [k for k in confi_dict.keys() if k.startswith(str(horizon))]
                 results_at_horizon = [confi_dict[k] for k in keys]
-                msg = [f"[{horizon * 100}%]"]
+                msg = [f"[{round(horizon * 100, 4)}%]"]
                 for k, res in zip(keys, results_at_horizon):
                     metric = k[k.find('_')+1:]
                     avg, interval = res
