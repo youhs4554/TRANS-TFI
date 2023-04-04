@@ -89,9 +89,8 @@ def run_experiments(model_name):
             horizons = DEFAULT_HORIZONS
             times = np.quantile(df_full["duration"][df_full["event"] == 1.0], horizons).tolist()
             if dataset == 'dialysis':
-                times = [365 * 1, 365 * 3, 365 * 5] # evaluate at 1yr, 3yr, 5yr
-                durations = np.sort(df_full["duration"][df_full["event"] == 1.0].values)
-                horizons = [ round(np.searchsorted(durations, t) / len(durations), 4) for t in times ]
+                times = [365 * 1, 365 * 3, 365 * 5, 365 * 7] # evaluate at 1yr, 3yr, 5yr, 7yr
+                horizons = [ f"{i}yr" for i in [1,3,5,7] ]
 
             y_train = format_labels(y_train)
             y_test = format_labels(y_test)
@@ -127,7 +126,10 @@ def run_experiments(model_name):
             for horizon in horizons:
                 keys = [k for k in confi_dict.keys() if k.startswith(str(horizon))]
                 results_at_horizon = [confi_dict[k] for k in keys]
-                msg = [f"[{round(horizon * 100, 4)}%]"]
+                if dataset == 'dialysis':
+                    msg = [f"[{horizon}]"]
+                else:
+                    msg = [f"[{round(horizon * 100, 4)}%]"]
                 for k, res in zip(keys, results_at_horizon):
                     metric = k[k.find('_')+1:]
                     avg, interval = res

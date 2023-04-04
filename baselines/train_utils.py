@@ -77,10 +77,8 @@ class PyCoxTrainer:
         self.dataset = dataset
         self.labtrans = labtrans
         if dataset == 'dialysis':
-            taus = [365 * 1, 365 * 3, 365 * 5] # evaluate at 1yr, 3yr, 5yr
-            durations = np.sort(df_full["duration"][df_full["event"] == 1.0].values)
-            horizons = [round(np.searchsorted(durations, t) / len(durations), 4) for t in taus]
-            self.cfg.horizons = horizons
+            taus = [365 * 1, 365 * 3, 365 * 5, 365 * 7] # evaluate at 1yr, 3yr, 5yr, 7yr
+            self.cfg.horizons = [ f"{i}yr" for i in [1,3,5,7] ]
         self.taus = taus
         self.train = (x_train, y_train)
         self.val = (x_val, y_val)
@@ -135,8 +133,6 @@ class PyCoxTrainer:
                 log = model.fit_dataloader(self.train, epochs=self.cfg.n_ep, callbacks=[tt.callbacks.EarlyStopping(patience=es_patience)],
                                            val_dataloader=self.val, verbose=verbose)
             else:
-                if dataset == 'dialysis':
-                    print()
                 log = model.fit(*self.train, epochs=self.cfg.n_ep, callbacks=[tt.callbacks.EarlyStopping(patience=es_patience)],
                                 val_data=self.val, verbose=verbose)
             if self.cfg.show_plot:
@@ -183,6 +179,9 @@ class PyTorchTrainer(PyCoxTrainer):
 
         self.dataset = dataset
         self.labtrans = labtrans
+        if dataset == 'dialysis':
+            taus = [365 * 1, 365 * 3, 365 * 5, 365 * 7] # evaluate at 1yr, 3yr, 5yr, 7yr
+            self.cfg.horizons = [ f"{i}yr" for i in [1,3,5,7] ]
         self.taus = taus
 
         self.train = train_loader

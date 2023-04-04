@@ -108,7 +108,10 @@ class Evaluator:
         for horizon in horizons:
             keys = [k for k in result_dict.keys() if k.startswith(str(horizon))]
             results_at_horizon = [result_dict[k] for k in keys]
-            msg = [f"[{round(horizon * 100, 4)}%]"]
+            if self.trainer.dataset == 'dialysis':
+                msg = [f"[{horizon}]"]
+            else:
+                msg = [f"[{round(horizon * 100, 4)}%]"]
             for k, res in zip(keys, results_at_horizon):
                 metric = k[k.find('_')+1:]
                 avg, interval = res
