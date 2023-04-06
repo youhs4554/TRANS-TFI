@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from easydict import EasyDict
 
 STConfig = EasyDict(
@@ -7,7 +9,7 @@ STConfig = EasyDict(
         'num_durations': 5, # num of discrete intervals for prediction, e.g., num_dur = 5 means the whole period is discretized to be 5 intervals
         'horizons': [.25, .5, .75], # the discrete intervals are cut at 0%, 25%, 50%, 75%, 100%
         'seed': 1234,
-        'checkpoint': './checkpoints/survtrace.pt',
+        'checkpoint': Path('./model_dir'),
         'vocab_size': 8, # num of all possible values of categorical features
         'hidden_size': 16, # embedding size
         'intermediate_size': 64, # intermediate layer size in transformer layer

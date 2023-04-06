@@ -6,7 +6,8 @@ import pandas as pd
 import torchtuples as tt
 import pdb
 import torch.nn.functional as F
-from pycox.models.interpolation import InterpolateLogisticHazard
+from pycox.models.interpolation import InterpolateLogisticHazard, InterpolatePMF
+from pycox.models import CoxPH, DeepHitSingle
 
 from .modeling_bert import BaseModel, BertEmbeddings, BertEncoder, BertCLS, BertCLSMulti
 from .utils import pad_col
@@ -289,7 +290,8 @@ class SurvTraceSingle(BaseModel):
                 preds = torch.cat(preds)
         return preds
 
-    def predict_hazard(self, input_ids, batch_size=None):
+    def predict_hazard(self, input_ids, batch_size=None, numpy=None, eval_=True, to_cpu=False,
+                     num_workers=0):
         preds = self.predict(input_ids, batch_size)
         if self.config.custom_training:
             hazard = F.sigmoid(preds)

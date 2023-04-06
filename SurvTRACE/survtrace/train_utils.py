@@ -242,7 +242,7 @@ class BERTAdam(Optimizer):
 ############################
 
 class Trainer:
-    def __init__(self, model, metrics=None):
+    def __init__(self, model, dataset, metrics=None):
         '''metrics must start from NLLPCHazardLoss, then be others
         '''
         self.model = model
@@ -255,14 +255,18 @@ class Trainer:
         self.get_target = lambda df: (df['duration'].values, df['event'].values)
         self.use_gpu = True if torch.cuda.is_available() else False
         if self.use_gpu:
-            print('use pytorch-cuda for training.')
+            # print('use pytorch-cuda for training.')
             self.model.cuda()
             self.model.use_gpu = True
         else:
             print('GPU not found! will use cpu for training!')
         self.early_stopping = None
-        ckpt_dir = os.path.dirname(model.config['checkpoint'])
-        self.ckpt = model.config['checkpoint']
+        ckpt_dir = model.config['checkpoint']
+        if model.config['custom_training']:
+            model_name = "TRANS-TFI"
+        else:
+            model_name = "SurvTrace"
+        self.ckpt = model.config['checkpoint'] / f"{model_name}_{dataset}.pth"
         if not os.path.exists(ckpt_dir):
             os.makedirs(ckpt_dir)
 
@@ -620,3 +624,6 @@ class Trainer:
         
         else:
             raise ValueError
+
+    def load_model_weights(self):
+        self.model.load_state_dict(torch.load(self.ckpt))

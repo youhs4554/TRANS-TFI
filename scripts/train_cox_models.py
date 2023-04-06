@@ -1,4 +1,6 @@
+import pickle
 import warnings
+from pathlib import Path
 
 import mlflow
 
@@ -18,6 +20,7 @@ from baselines.datasets import load_data
 from baselines.utils import seed_everything
 
 DATASETS = ['gbsg', 'metabric', 'dialysis']
+MODEL_SAVE_DIR = Path('./model_dir')
 
 MODEL_DICT = {
     "cph": CoxPHSurvivalAnalysis,
@@ -97,6 +100,10 @@ def run_experiments(model_name):
 
             model = MODEL_DICT[model_name]()
             model.fit(x_train, y_train)
+
+            model_save_path = MODEL_SAVE_DIR / f"{model_name}_{dataset}.pkl"
+            with open(model_save_path, 'wb') as f:
+                pickle.dump(model, f)
 
             result_dict = defaultdict(list)
             for i in range(nb_bootstrap):

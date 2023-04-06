@@ -102,43 +102,39 @@ class PyCoxTrainer:
         net.to(self.cfg.device)
         return net
 
-    def fit_and_predict(self, dataset, weight_file=''):
-        self.preprocess(dataset)
-        net = self.make_net()
+    def init_model(self, net):
         kwargs = {}
         if self.cfg.model_name == "DeepHitSingle":
             kwargs.update({"alpha": self.cfg.alpha, "sigma": self.cfg.sigma})
         if self.labtrans is not None:
             kwargs["duration_index"] = self.labtrans.cuts
 
-        fitting = True
-        if weight_file:
-            assert os.path.exists(weight_file)
-            fitting = False
-            state_dict = torch.load(weight_file)
-            net.load_state_dict(state_dict)
-
         model = self.model_class(net, tt.optim.Adam(lr=self.cfg.lr, weight_decay=self.cfg.weight_decay), **kwargs)
+        return model
+
+    def fit_and_predict(self, dataset):
+        self.preprocess(dataset)
+        net = self.make_net()
+        self.model = model = self.init_model(net)
 
         if hasattr(model, 'compute_baseline_hazards'):
             model.training_data = self.train
 
-        if fitting:
-            self.logger.info(
-                f"[{self.cfg.model_name}@{dataset}] time_range={self.cfg.time_range}, L={self.cfg.seq_len}, interpolate={self.interpolate_discrete_times}")
-            verbose = False if self.cfg.silent_fit else True
-            es_patience = self.cfg.es_patience
+        self.logger.info(
+            f"[{self.cfg.model_name}@{dataset}] time_range={self.cfg.time_range}, L={self.cfg.seq_len}, interpolate={self.interpolate_discrete_times}")
+        verbose = False if self.cfg.silent_fit else True
+        es_patience = self.cfg.es_patience
 
-            if isinstance(self.train, DataLoader) and isinstance(self.val, DataLoader):
-                log = model.fit_dataloader(self.train, epochs=self.cfg.n_ep, callbacks=[tt.callbacks.EarlyStopping(patience=es_patience)],
-                                           val_dataloader=self.val, verbose=verbose)
-            else:
-                log = model.fit(*self.train, epochs=self.cfg.n_ep, callbacks=[tt.callbacks.EarlyStopping(patience=es_patience)],
-                                val_data=self.val, verbose=verbose)
-            if self.cfg.show_plot:
-                log.plot();
-                plt.show()
-            history = log.to_pandas()
+        if isinstance(self.train, DataLoader) and isinstance(self.val, DataLoader):
+            log = model.fit_dataloader(self.train, epochs=self.cfg.n_ep, callbacks=[tt.callbacks.EarlyStopping(patience=es_patience)],
+                                       val_dataloader=self.val, verbose=verbose)
+        else:
+            log = model.fit(*self.train, epochs=self.cfg.n_ep, callbacks=[tt.callbacks.EarlyStopping(patience=es_patience)],
+                            val_data=self.val, verbose=verbose)
+        if self.cfg.show_plot:
+            log.plot();
+            plt.show()
+        history = log.to_pandas()
 
         # Inference
         x_test, _ = self.test
@@ -151,9 +147,14 @@ class PyCoxTrainer:
 
         self.trained_model = model
         model_save_path = self.model_save_dir / f"{self.model_name}_{self.time_range}_L{self.seq_len}_{dataset}.pth"
-        self.trained_model.save_model_weights(model_save_path)
+        self.trained_model.save_net(model_save_path)
 
         return surv, model, history
+
+    def load_model_weights(self, weight_file):
+        net = torch.load(weight_file)
+        self.trained_model = self.init_model(net)
+        return self.trained_model
 
 class PyTorchTrainer(PyCoxTrainer):
     def __init__(self, cfg: Config):

@@ -85,7 +85,7 @@ def run_experiment(dataset, custom_training=True, show_plot=False):
         model = SurvTraceSingle(STConfig)
 
         # initialize a trainer
-        trainer = Trainer(model, metrics=metrics)
+        trainer = Trainer(model, dataset, metrics=metrics)
         train_loss, val_loss = trainer.fit((df_train, df_y_train), (df_val, df_y_val),
                                            batch_size=hparams['batch_size'],
                                            epochs=hparams['epochs'],
