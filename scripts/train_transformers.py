@@ -151,6 +151,6 @@ def fit_report(custom_training):
     results = []
 
 
-# fit_report(custom_training=False)
+fit_report(custom_training=False)
 fit_report(custom_training=True)
 

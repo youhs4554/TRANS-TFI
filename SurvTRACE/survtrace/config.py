@@ -8,8 +8,8 @@ STConfig = EasyDict(
         'injection_type': 'linear', # (linear | linear_norm | positional_encoding)
         'data': 'metabric', # dataset name, in 'metabric', 'support', or 'seer'
         'num_durations': 5, # num of discrete intervals for prediction, e.g., num_dur = 5 means the whole period is discretized to be 5 intervals
-        # 'horizons': [round(i, 2)/100 for i in range(5, 95, 5)], # the discrete intervals are cut at 5%, 10%, 15%, ..., 95%
-        'horizons': [.25, .5, .75],
+        'horizons': [round(i, 2)/100 for i in range(5, 95, 5)], # the discrete intervals are cut at 5%, 10%, 15%, ..., 95%
+        # 'horizons': [.25, .5, .75],
         'seed': 1234,
         'checkpoint': Path('./model_dir'),
         'vocab_size': 8, # num of all possible values of categorical features
