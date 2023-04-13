@@ -1,3 +1,4 @@
+import os.path
 from pathlib import Path
 
 import torch
@@ -22,6 +23,7 @@ class Config(EasyDict):
     random_state = 1234  # static random state for deterministic results
     n_ep = 3000  # number of epochs
     model_save_dir = Path('./model_dir')
+    model_save_dir.mkdir(exist_ok=True)
 
     @classmethod
     def setup(cls):
@@ -54,7 +56,8 @@ class Config(EasyDict):
         else:
             cls.device = torch.device("mps") # Apple's M1 mac setup
 
-        cls.logs_dir = Path('./logs') / cls.model_name
+        cls.logs_dir = Path('./logs')
+        cls.logs_dir.mkdir(exist_ok=True)
 
         if cls.model_name in BASELINE_MODEL_FAMILY:
             cls.net_kwargs = dict(

@@ -131,4 +131,4 @@ class Evaluator:
         tb = pt.PrettyTable(title=title)
         tb.field_names = self.headers
         tb.add_row(self.results)
-        self.trainer.logger.info(tb)
+        print(tb)

@@ -257,4 +257,9 @@ class LossTDSurv(nn.Module):
         # weighted average of L_z and L_c
         loss = (self.alpha * L_z) + ((1 - self.alpha) * L_c)
         loss += self.beta * nll_loss
+
+        self.L_z = L_z
+        self.L_c = L_c
+        self.nll_loss = nll_loss
+
         return loss

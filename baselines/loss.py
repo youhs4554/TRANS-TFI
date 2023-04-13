@@ -4,10 +4,9 @@ from torch import nn
 from pycox.models.loss import nll_logistic_hazard
 
 class LossTDSurv(nn.Module):
-    def __init__(self, alpha=0.5, beta=1.0):
+    def __init__(self, alpha=0.5):
         super().__init__()
         self.alpha = alpha
-        self.beta = beta
 
     def event_time_loss(self, preds, idx_durations):
         """
@@ -59,14 +58,6 @@ class LossTDSurv(nn.Module):
         log_Wt = self.log_event_rate(preds, idx_durations).squeeze()
         L_c = -(c * log_St + (1 - c) * log_Wt).mean(dim=0).squeeze()
 
-        def inverse_sigmoid(y):
-            one_minus_y = (1-y) + 1e-12
-            y_ = y + 1e-12
-            return torch.log(y_ / one_minus_y)
-
-        nll_loss = nll_logistic_hazard(inverse_sigmoid(preds[..., 0]), idx_durations.long(), events.float())
-
         # weighted average of L_z and L_c
         loss = (self.alpha * L_z) + ((1 - self.alpha) * L_c)
-        loss += self.beta * nll_loss
         return loss

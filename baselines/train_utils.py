@@ -1,4 +1,5 @@
 import os.path
+from pathlib import Path
 
 import numpy as np
 import pycox.models
@@ -32,7 +33,6 @@ class PyCoxTrainer:
         self.df_test_raw = None
 
         self.trained_model = None
-        self.logger = None
 
         self.model_name = cfg.model_name
         self.net_class = tt.practical.MLPVanilla
@@ -43,7 +43,6 @@ class PyCoxTrainer:
         self.seq_len = cfg.seq_len
         self.interpolate_discrete_times = cfg.interpolate_discrete_times
         self.model_save_dir = cfg.model_save_dir
-        os.makedirs(self.model_save_dir, exist_ok=True)
         self.cfg = cfg
 
         # for deterministic results
@@ -120,7 +119,7 @@ class PyCoxTrainer:
         if hasattr(model, 'compute_baseline_hazards'):
             model.training_data = self.train
 
-        self.logger.info(
+        print(
             f"[{self.cfg.model_name}@{dataset}] time_range={self.cfg.time_range}, L={self.cfg.seq_len}, interpolate={self.interpolate_discrete_times}")
         verbose = False if self.cfg.silent_fit else True
         es_patience = self.cfg.es_patience
@@ -132,9 +131,13 @@ class PyCoxTrainer:
             log = model.fit(*self.train, epochs=self.cfg.n_ep, callbacks=[tt.callbacks.EarlyStopping(patience=es_patience)],
                             val_data=self.val, verbose=verbose)
         if self.cfg.show_plot:
-            log.plot();
-            plt.show()
+            with plt.style.context('ggplot'):
+                log.plot()
+                plt.xlabel('epoch'); plt.ylabel('loss')
+                plt.show()
         history = log.to_pandas()
+        history.to_csv(self.cfg.logs_dir / f"{self.model_name}_{self.time_range}_L{self.seq_len}_{dataset}.csv",
+                       index_label='epoch')
 
         # Inference
         x_test, _ = self.test
@@ -160,11 +163,7 @@ class PyTorchTrainer(PyCoxTrainer):
     def __init__(self, cfg: Config):
         super(PyTorchTrainer, self).__init__(cfg)
         self.net_class = models.TDSA
-        beta = 1.0
-        if not cfg.model_name == 'BTDSA':
-            beta = 0.0
-
-        self.model_class = lambda net, optimizer, duration_index: models.PyCoxWrapper(net, LossTDSurv(beta=beta),
+        self.model_class = lambda net, optimizer, duration_index: models.PyCoxWrapper(net, LossTDSurv(),
                                                                                       optimizer,
                                                                                       duration_index=duration_index)
 

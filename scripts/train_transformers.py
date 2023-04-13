@@ -4,9 +4,11 @@
 # Run SurvTRACE on GBSG, Metabric, Support  datasets
 
 import warnings
+from pathlib import Path
 
 import mlflow
 import numpy as np
+import pandas as pd
 
 from SurvTRACE.survtrace.custom_loss import LossTDSurv
 from SurvTRACE.survtrace.losses import NLLPCHazardLoss
@@ -29,10 +31,6 @@ import prettytable as pt
 
 DATASETS = ['gbsg', 'metabric', 'dialysis']
 
-from baselines.utils import create_logger
-
-logger = create_logger('./logs_survtrace')
-
 headers = DATASETS
 
 results = []
@@ -44,7 +42,7 @@ def run_experiment(dataset, custom_training=True, show_plot=False):
         model_name = "TRANS-TFI"
     else:
         model_name = "SurvTrace"
-    logger.info(f"Training {model_name}@{dataset}...")
+    print(f"Training {model_name}@{dataset}...")
 
     # define the setup parameters
     STConfig.data = dataset
@@ -84,13 +82,19 @@ def run_experiment(dataset, custom_training=True, show_plot=False):
         # get model
         model = SurvTraceSingle(STConfig)
 
+        if STConfig.custom_training:
+            mlflow.log_param('injection_type', STConfig.injection_type)
+        mlflow.log_param('L', STConfig.out_feature)
+        mlflow.log_param('embedding_size', STConfig.hidden_size)
+
         # initialize a trainer
         trainer = Trainer(model, dataset, metrics=metrics)
-        train_loss, val_loss = trainer.fit((df_train, df_y_train), (df_val, df_y_val),
+        history = trainer.fit((df_train, df_y_train), (df_val, df_y_val),
                                            batch_size=hparams['batch_size'],
                                            epochs=hparams['epochs'],
                                            learning_rate=hparams['learning_rate'],
                                            weight_decay=hparams['weight_decay'])
+        history = pd.DataFrame.from_dict(history)
 
         # evaluate model
         evaluator = Evaluator(df, df_train.index)
@@ -120,13 +124,14 @@ def run_experiment(dataset, custom_training=True, show_plot=False):
 
         if show_plot:
             # show training curves
-            plt.plot(train_loss, label='train')
-            plt.plot(val_loss, label='val')
-            plt.legend(fontsize=20)
-            plt.xlabel('epoch', fontsize=20)
-            plt.ylabel('loss', fontsize=20)
+            with plt.style.context('ggplot'):
+                history.plot()
+            plt.xlabel('epoch')
+            plt.ylabel('loss')
             plt.show()
 
+        history.to_csv(Path('./logs') / f"{model_name}_{dataset}.csv",
+                       index_label='epoch')
 
 def fit_report(custom_training):
     global results
@@ -142,10 +147,10 @@ def fit_report(custom_training):
     tb = pt.PrettyTable(title=title)
     tb.field_names = headers
     tb.add_row(results)
-    logger.info(tb)
+    print(tb)
     results = []
 
 
-fit_report(custom_training=False)
+# fit_report(custom_training=False)
 fit_report(custom_training=True)
 

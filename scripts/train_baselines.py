@@ -9,11 +9,7 @@ sys.path.append(os.path.abspath('../baselines'))
 from baselines.config import Config, BASELINE_MODEL_FAMILY, TIME_INJECTION_MODEL_FAMILY
 from baselines.eval_utils import Evaluator
 from baselines.train_utils import init_trainer
-from baselines.utils import create_logger
 import mlflow
-
-logger = create_logger(logs_dir='../experiments/logs')
-
 
 def run_experiment(model_name, time_range='full'):
     ev = Evaluator()  # custom evaluation interface
@@ -33,7 +29,6 @@ def run_experiment(model_name, time_range='full'):
             mlflow.log_param('time_range', cfg.time_range)
             mlflow.log_param('L', cfg.seq_len)
             trainer = init_trainer(cfg)
-            trainer.logger = logger  # assign logger
 
             trainer.fit_and_predict(dataset)
             ev.trainer = trainer
