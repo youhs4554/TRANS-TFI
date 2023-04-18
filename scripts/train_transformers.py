@@ -38,7 +38,7 @@ results = []
 log_dir = Path('./logs')
 log_dir.mkdir(exist_ok=True)
 
-def run_experiment(dataset, custom_training=True, time_range='full', injection_type='linear', interval=5, show_plot=False):
+def run_experiment(dataset, custom_training=True, time_range='full', injection_type=None, interval=None, show_plot=False):
     assert dataset in DATASETS
     if custom_training:
         model_name = "TRANS-TFI"
@@ -102,7 +102,7 @@ def run_experiment(dataset, custom_training=True, time_range='full', injection_t
         mlflow.log_param('time_range', time_range)
 
         # initialize a trainer
-        trainer = Trainer(model, dataset, metrics=metrics)
+        trainer = Trainer(model, dataset, metrics=metrics, interval=interval, injection_type=injection_type, time_range=time_range)
         history = trainer.fit((df_train, df_y_train), (df_val, df_y_val),
                                            batch_size=hparams['batch_size'],
                                            epochs=hparams['epochs'],
@@ -147,7 +147,7 @@ def run_experiment(dataset, custom_training=True, time_range='full', injection_t
         history.to_csv(log_dir / f"{model_name}_{dataset}.csv",
                        index_label='epoch')
 
-def fit_report(custom_training, time_range, injection_type=None, interval=5):
+def fit_report(custom_training, time_range, injection_type=None, interval=None):
     global results
 
     for dataset in DATASETS:

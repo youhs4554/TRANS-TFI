@@ -242,7 +242,7 @@ class BERTAdam(Optimizer):
 ############################
 
 class Trainer:
-    def __init__(self, model, dataset, metrics=None):
+    def __init__(self, model, dataset, injection_type, interval, time_range, metrics=None):
         '''metrics must start from NLLPCHazardLoss, then be others
         '''
         self.model = model
@@ -266,7 +266,17 @@ class Trainer:
             model_name = "TRANS-TFI"
         else:
             model_name = "SurvTrace"
-        self.ckpt = model.config['checkpoint'] / f"{model_name}_{dataset}.pth"
+        self.ckpt = model.config['checkpoint']
+        filename = f"{model_name}_{dataset}"
+
+        if injection_type:
+            filename += f"_{injection_type}"
+        if interval:
+            filename += f"_delta{interval}"
+        if time_range:
+            filename += f"_{time_range}"
+
+        self.ckpt  = self.ckpt / (filename + '.pth')
         if not os.path.exists(ckpt_dir):
             os.makedirs(ckpt_dir)
 
