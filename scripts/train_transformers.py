@@ -50,7 +50,8 @@ def run_experiment(dataset, custom_training=True, time_range='full', injection_t
     STConfig.data = dataset
     STConfig.early_stop_patience = 5
     STConfig.custom_training = custom_training
-    STConfig.injection_type = injection_type
+    if STConfig.custom_training:
+        STConfig.injection_type = injection_type
     STConfig.interval = interval
 
     metrics = [NLLPCHazardLoss(), ]
@@ -146,7 +147,7 @@ def run_experiment(dataset, custom_training=True, time_range='full', injection_t
         history.to_csv(log_dir / f"{model_name}_{dataset}.csv",
                        index_label='epoch')
 
-def fit_report(custom_training, time_range, injection_type, interval=5):
+def fit_report(custom_training, time_range, injection_type=None, interval=5):
     global results
 
     for dataset in DATASETS:
@@ -164,8 +165,15 @@ def fit_report(custom_training, time_range, injection_type, interval=5):
     results = []
 
 
+# SurvTrace Training
+fit_report(custom_training=False, time_range='truncated')
+
+for interval in [1, 5, 10, 15, 20]:
+    fit_report(custom_training=False, time_range='full', interval=interval)
+
+# TRANS-TFI Training
 for injection_type in ['linear', 'linear_norm', 'positional_encoding']:
-    fit_report(custom_training=False, time_range='truncated', injection_type=injection_type)
+    fit_report(custom_training=True, time_range='truncated', injection_type=injection_type)
 
 for injection_type, interval in product(['linear', 'linear_norm', 'positional_encoding'], [1, 5, 10, 15, 20]):
-    fit_report(custom_training=False, time_range='full', injection_type=injection_type, interval=interval)
+    fit_report(custom_training=True, time_range='full', injection_type=injection_type, interval=interval)
