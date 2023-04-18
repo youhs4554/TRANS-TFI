@@ -68,8 +68,8 @@ class Config(EasyDict):
             )
         elif cls.model_name in TIME_INJECTION_MODEL_FAMILY:
             cls.net_kwargs = dict(
-                hidden_dim=64,
-                n_layers=3,  # number of LSTM layer(s)
+                hidden_dim=128,
+                n_layers=1,  # number of LSTM layer(s)
             )
         else:
             raise NotImplementedError(f"Unsupported model_name={cls.model_name}")

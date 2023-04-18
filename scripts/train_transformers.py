@@ -4,6 +4,7 @@
 # Run SurvTRACE on GBSG, Metabric, Support  datasets
 
 import warnings
+from itertools import product
 from pathlib import Path
 
 import mlflow
@@ -34,9 +35,10 @@ DATASETS = ['gbsg', 'metabric', 'dialysis']
 headers = DATASETS
 
 results = []
+log_dir = Path('./logs')
+log_dir.mkdir(exist_ok=True)
 
-
-def run_experiment(dataset, custom_training=True, show_plot=False):
+def run_experiment(dataset, custom_training=True, time_range='full', injection_type='linear', interval=5, show_plot=False):
     assert dataset in DATASETS
     if custom_training:
         model_name = "TRANS-TFI"
@@ -48,6 +50,8 @@ def run_experiment(dataset, custom_training=True, show_plot=False):
     STConfig.data = dataset
     STConfig.early_stop_patience = 5
     STConfig.custom_training = custom_training
+    STConfig.injection_type = injection_type
+    STConfig.interval = interval
 
     metrics = [NLLPCHazardLoss(), ]
     if STConfig['custom_training']:
@@ -69,6 +73,13 @@ def run_experiment(dataset, custom_training=True, show_plot=False):
 
     with mlflow.start_run(experiment_id=experiment.experiment_id,
                           run_name=model_name):
+        if time_range == 'full':
+            STConfig['horizons'] = [round(i, 2) / 100 for i in np.arange(5, 96, STConfig['interval'])]
+            interval = STConfig.interval
+        elif time_range == 'truncated':
+            STConfig['horizons'] = [.25, .5, .75]
+            interval = 25
+
         # load data
         df, df_train, df_y_train, df_test, df_y_test, df_val, df_y_val = load_data(STConfig)
 
@@ -86,6 +97,8 @@ def run_experiment(dataset, custom_training=True, show_plot=False):
             mlflow.log_param('injection_type', STConfig.injection_type)
         mlflow.log_param('L', STConfig.out_feature)
         mlflow.log_param('embedding_size', STConfig.hidden_size)
+        mlflow.log_param('interval', interval)
+        mlflow.log_param('time_range', time_range)
 
         # initialize a trainer
         trainer = Trainer(model, dataset, metrics=metrics)
@@ -130,14 +143,14 @@ def run_experiment(dataset, custom_training=True, show_plot=False):
             plt.ylabel('loss')
             plt.show()
 
-        history.to_csv(Path('./logs') / f"{model_name}_{dataset}.csv",
+        history.to_csv(log_dir / f"{model_name}_{dataset}.csv",
                        index_label='epoch')
 
-def fit_report(custom_training):
+def fit_report(custom_training, time_range, injection_type, interval=5):
     global results
 
     for dataset in DATASETS:
-        run_experiment(dataset, custom_training=custom_training, show_plot=False)
+        run_experiment(dataset, custom_training=custom_training, time_range=time_range, injection_type=injection_type, interval=interval, show_plot=False)
 
     if custom_training:
         title = "TRANS-TFI"
@@ -151,6 +164,8 @@ def fit_report(custom_training):
     results = []
 
 
-fit_report(custom_training=False)
-fit_report(custom_training=True)
+for injection_type in ['linear', 'linear_norm', 'positional_encoding']:
+    fit_report(custom_training=False, time_range='truncated', injection_type=injection_type)
 
+for injection_type, interval in product(['linear', 'linear_norm', 'positional_encoding'], [1, 5, 10, 15, 20]):
+    fit_report(custom_training=False, time_range='full', injection_type=injection_type, interval=interval)
