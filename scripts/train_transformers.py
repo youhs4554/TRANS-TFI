@@ -129,10 +129,10 @@ def run_experiment(dataset, custom_training=True, time_range='full', injection_t
                 msg = [f"[{round(horizon * 100, 4)}%]"]
             for k, res in zip(keys, results_at_horizon):
                 metric = k[k.find('_')+1:]
-                avg, interval = res
-                msg.append(f"{metric}: {avg:.4f} ({interval:.4f})")
+                avg, interval_ = res
+                msg.append(f"{metric}: {avg:.4f} ({interval_:.4f})")
                 mlflow.log_metric(str(horizon) + '_' + metric + '__avg', avg)
-                mlflow.log_metric(str(horizon) + '_' + metric + '__interval', interval)
+                mlflow.log_metric(str(horizon) + '_' + metric + '__interval', interval_)
             row_str += (" ".join(msg) + "\n")
         results.append(row_str)
 
@@ -144,7 +144,16 @@ def run_experiment(dataset, custom_training=True, time_range='full', injection_t
             plt.ylabel('loss')
             plt.show()
 
-        history.to_csv(log_dir / f"{model_name}_{dataset}.csv",
+        filename = f"{model_name}_{dataset}"
+
+        if injection_type:
+            filename += f"_{injection_type}"
+        if interval:
+            filename += f"_delta{interval}"
+        if time_range:
+            filename += f"_{time_range}"
+
+        history.to_csv(log_dir / (filename + '.csv'),
                        index_label='epoch')
 
 def fit_report(custom_training, time_range, injection_type=None, interval=None):
@@ -165,15 +174,18 @@ def fit_report(custom_training, time_range, injection_type=None, interval=None):
     results = []
 
 
-# SurvTrace Training
-fit_report(custom_training=False, time_range='truncated')
+if __name__ == '__main__':
+    interval_list = [0.5, 1, 1.5, 2, 2.5, 5, 10, 15, 20]
 
-for interval in [1, 5, 10, 15, 20]:
-    fit_report(custom_training=False, time_range='full', interval=interval)
+    # SurvTrace Training
+    fit_report(custom_training=False, time_range='truncated')
 
-# TRANS-TFI Training
-for injection_type in ['linear', 'linear_norm', 'positional_encoding']:
-    fit_report(custom_training=True, time_range='truncated', injection_type=injection_type)
+    for interval in interval_list:
+        fit_report(custom_training=False, time_range='full', interval=interval)
 
-for injection_type, interval in product(['linear', 'linear_norm', 'positional_encoding'], [1, 5, 10, 15, 20]):
-    fit_report(custom_training=True, time_range='full', injection_type=injection_type, interval=interval)
+    # TRANS-TFI Training
+    for injection_type in ['linear', 'linear_norm', 'positional_encoding']:
+        fit_report(custom_training=True, time_range='truncated', injection_type=injection_type)
+
+    for injection_type, interval in product(['linear', 'linear_norm', 'positional_encoding'], interval_list):
+        fit_report(custom_training=True, time_range='full', injection_type=injection_type, interval=interval)

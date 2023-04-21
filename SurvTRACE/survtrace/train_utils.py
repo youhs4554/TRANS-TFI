@@ -364,7 +364,7 @@ class Trainer:
                     phi_val = self.model.predict(tensor_val, val_batch_size)
 
                 val_loss = self.metrics[0](phi_val, tensor_y_val[:,0].long(), tensor_y_val[:,1].long(), tensor_y_val[:,2].float())
-                print("[Train-{}]: {}".format(epoch, epoch_loss))
+                print("[Train-{}]: {}".format(epoch, epoch_loss / (batch_idx + 1)))
                 print("[Val-{}]: {}".format(epoch, val_loss.item()))
                 history['val_loss'].append(val_loss.item())
                 self.early_stopping(val_loss.item(), self.model, name=self.ckpt)
@@ -466,7 +466,7 @@ class Trainer:
                     phi_val = self.model.predict(tensor_val, val_batch_size)
 
                 val_loss = self.metrics[0](phi_val.sigmoid().unsqueeze(2), tensor_y_val)
-                print("[Train-{}]: {}".format(epoch, epoch_loss))
+                print("[Train-{}]: {}".format(epoch, epoch_loss / (batch_idx + 1)))
                 print("[Val-{}]: {}".format(epoch, val_loss.item()))
                 history['val_loss'].append(val_loss.item())
                 history['val_L_z'].append(self.metrics[0].L_z.item())

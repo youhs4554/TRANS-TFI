@@ -142,3 +142,4 @@ logs/
 *model_dir/
 *mlruns
 PatientData.xlsx
+*runs/
